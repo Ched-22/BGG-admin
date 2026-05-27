@@ -1,0 +1,572 @@
+Login
+
+**Campos de Login**
+
+- Endereço de E-mail
+- Senha
+- Botão Entrar
+- Link Cadastrar-se
+- Link Esqueci minha senha
+- Caixa de seleção Lembrar-me (opcional)
+
+**Convite para Registro - Campos**
+
+- Primeiro Nome (já preenchido)
+- Sobrenome (já preenchido)
+- Endereço de E-mail (já preenchido)
+- Senha
+- Confirmar Senha
+
+**Campos de Esqueci minha senha**
+
+- Esqueci minha senha
+  - Endereço de E-mail
+  - Botão Reenviar (para enviar outro e-mail)
+  - Link Entrar
+  - Link Cadastrar-se
+- Redefinir Senha
+  - Nova Senha
+  - Confirmar Senha
+
+**Mensagens de Validação/Erro**
+
+- Login
+  - Endereço de E-mail
+    - Endereço de e-mail é obrigatório
+    - Digite um endereço de e-mail válido
+    - Nenhuma conta de administrador foi encontrada com este e-mail
+  - Senha
+    - Senha é obrigatória
+    - O e-mail ou senha que você digitou está incorreto
+    - Por favor, tente novamente ou redefina sua senha
+  - Digite seu endereço de e-mail e senha para continuar
+- Registro
+  - Senha
+    - Senha é obrigatória
+    - A senha deve ter pelo menos 8 caracteres
+    - A senha deve incluir letra maiúscula, minúscula, número e caractere especial
+  - Confirmar Senha
+    - Por favor, confirme sua senha.
+    - As senhas não coincidem
+- Esqueci minha senha
+  - Endereço de E-mail
+    - Endereço de e-mail é obrigatório
+    - Digite um endereço de e-mail válido
+    - Muitas solicitações de redefinição de senha. Por favor, tente novamente mais tarde.
+  - Nova Senha
+    - Senha é obrigatória.
+    - Senha é obrigatória
+    - A senha deve ter pelo menos 8 caracteres
+    - A senha deve incluir letra maiúscula, minúscula, número e caractere especial
+  - Confirmar Senha
+    - Por favor, confirme sua senha.
+    - As senhas não coincidem
+
+Dashboard
+- Cards de Resumo
+  - Cards de Orçamentos
+    - Orçamentos Pendentes
+    - Orçamentos Prontos para Enviar
+  - Cards de Tarefas
+    - Novas Solicitações de Tarefa
+    - Tarefas não Agendadas
+    - Tarefas sem Técnico
+    - Prontas para QA (Revisão)
+  - Tarefas agendadas para a data atual
+    - Tarefas agendadas para &quot;hoje&quot;
+      - Tipo de Serviço
+      - Endereço
+      - Técnico designado
+  - Chats
+    - Chats novos/não lidos
+    - Mensagens de Técnicos
+  - Alertas
+    - Tarefas Canceladas
+    - Pagamentos com Falha
+    - Pagamentos Recebidos
+    - Conflitos de agenda do técnico
+
+- Designs &amp; Ações
+  - Cards de Orçamentos
+    - Orçamentos Pendentes
+      - Exibir
+        - Contagem total de orçamentos pendentes
+        - Ordenar pela data do orçamento pendente mais antigo
+        - ID da Tarefa
+          - Título do Projeto
+          - Nome do Cliente
+          - Tipo de Serviço
+          - Endereço da Propriedade
+          - Valor do Orçamento
+      - Ações
+        - Visualizar todos os orçamentos pendentes
+        - Abrir detalhes do orçamento
+        - Editar orçamento
+        - Aprovar orçamento
+    - Orçamento pronto para enviar
+      - Exibir
+        - Contagem total de orçamentos prontos para enviar
+        - ID da Tarefa
+          - Título do Projeto
+          - Nome do Cliente
+          - Tipo de Serviço
+          - Endereço da Propriedade
+          - Valor do Orçamento
+      - Ações
+        - Visualizar orçamento
+        - Abrir detalhes do orçamento
+        - Editar orçamento
+        - Enviar orçamento para o cliente
+  - Cards de Tarefas
+    - Novas Solicitações de Tarefa
+      - Exibir
+        - Total de novas solicitações
+        - ID da Tarefa
+          - Título do Projeto
+          - Nome do Cliente
+          - Tipo de Serviço
+          - Descrição/Resumo da Tarefa
+          - Endereço da Propriedade
+          - Data e hora de envio
+      - Ações
+        - Visualizar detalhes da tarefa
+        - Contatar cliente
+        - Rejeitar tarefa
+    - Tarefas não Agendadas
+      - Exibir
+        - Total de tarefas não agendadas
+        - ID da Tarefa
+          - Título do Projeto
+          - Nome do Cliente
+          - Tipo de Serviço
+          - Descrição/Resumo da Tarefa
+          - Endereço da Propriedade
+          - Agenda preferencial
+      - Ações
+        - Visualizar detalhes da tarefa
+        - Agendar tarefa
+        - Substituir técnico designado (se já houver um técnico designado)
+        - Rejeitar tarefa
+    - Tarefas sem Técnico
+      - Exibir
+        - Total de tarefas sem técnico
+        - ID da Tarefa
+          - Título do Projeto
+          - Nome do Cliente
+          - Tipo de Serviço
+          - Descrição/Resumo da Tarefa
+          - Endereço da Propriedade
+          - Data e hora agendadas
+      - Ações
+        - Visualizar detalhes da tarefa
+        - Designar técnico
+          - Visualizar técnicos disponíveis
+        - Redesignar técnico
+        - Substituir agenda
+        - Mover de volta para não agendadas
+        - Rejeitar tarefa
+    - Pronto para QA/Revisão
+      - Exibir
+        - Total de tarefas para QA
+          - ID da Tarefa
+            - Título do Projeto
+            - Nome do Cliente
+            - Tipo de Serviço
+            - Descrição/Resumo da Tarefa
+            - Endereço da Propriedade
+            - Data e hora de conclusão
+      - Ações
+        - Visualizar detalhes da tarefa
+        - Revisar anotações do técnico
+        - Revisar fotos/comprovantes de conclusão
+        - Aprovar conclusão da tarefa
+        - Solicitar revisão/acompanhamento
+    - Tarefas agendadas para a data atual
+      - Exibir
+        - ID da Tarefa
+          - Título do Projeto
+          - Nome do Cliente
+          - Tipo de Serviço
+          - Descrição/Resumo da Tarefa
+          - Endereço da Propriedade
+          - Horário agendado
+      - Ações
+        - Visualizar detalhes da tarefa
+        - Abrir visualização de calendário
+        - Abrir perfil do técnico
+        - Redesignar técnico
+
+
+Página de Tarefas Abertas
+
+**Painel de Tarefas Abertas**
+
+- Ações do Cabeçalho
+  - Botão Criar Tarefa (criar manualmente uma tarefa na operação interna)
+- Colunas
+  - ID da Tarefa
+  - Nome do Cliente
+  - Título do Projeto
+  - Tipo de Serviço
+  - Status da Tarefa
+  - Data de Agendamento
+  - Horário de Agendamento
+  - Data de Criação
+  - Ações
+- Ações na coluna Ação
+  - Agendar Tarefa
+  - Cancelar Tarefa
+- Filtros
+  - Buscar
+  - Status da Tarefa
+  - Tipo de Serviço
+  - Data Agendada
+- Mensagens de confirmação
+  - Tem certeza de que deseja agendar esta tarefa?
+  - Tem certeza de que deseja cancelar esta tarefa? Isso pode notificar o cliente e o técnico designado.
+  - Tem certeza de que deseja criar uma tarefa?
+
+**Página de Tarefa Aberta**
+
+- Cabeçalho da Tarefa (somente leitura)
+  - ID da Tarefa
+  - Título do Projeto
+  - Status da Tarefa
+  - Tipo de Serviço
+  - Data de Criação
+  - Última Atualização
+- Seção de Informações do Cliente (somente leitura)
+  - Nome do Cliente (clicável)
+  - Endereço da Propriedade (clicável)
+    - Unidade/Apartamento/Sala
+    - Cidade
+    - Estado
+    - Código Postal
+- Seção de Detalhes da Tarefa (somente leitura)
+  - Descrição da Tarefa
+  - Agenda Solicitada
+  - Anexos (foto, vídeo, documentos)
+    - Botão Visualizar
+    - Botão Baixar
+- Seção de Detalhes de Agenda &amp; Técnico (somente leitura)
+  - Data de Agendamento
+  - Horário Agendado
+  - Status do Técnico
+  - Anotações do Técnico
+  - Técnico Designado (clicável)
+    - Contato do técnico
+  - Botão DESIGNAR TÉCNICO
+  - Botão AGENDAR TAREFA
+- Seção de Detalhes de Orçamento &amp; Pagamento (somente leitura)
+  - Valor do Orçamento
+  - Status do Pagamento
+  - ID da Fatura
+  - Método de Pagamento
+  - Depósito
+  - Saldo Restante
+  - Botão EDITAR ORÇAMENTO
+  - Botão APROVAR ORÇAMENTO
+  - Botão ENVIAR PARA O CLIENTE
+  - Botão REENVIAR ORÇAMENTO
+- Seção de QA/Revisão
+  - Anotações de Conclusão (somente leitura)
+  - Fotos de Conclusão (somente leitura)
+  - Data e Hora de Conclusão (somente leitura)
+  - Status de QA (somente leitura)
+  - Anotações de QA (campo de texto, opcional)
+  - Botão Salvar
+    - Tem certeza de que deseja salvar estas anotações de QA?
+    - Anotações de QA foram salvas com sucesso.
+    - Não foi possível salvar as anotações de QA. Por favor, tente novamente.
+    - Anotações de QA não podem mais ser editadas porque esta tarefa já foi concluída.
+- Registro de Atividade
+  - Data e Hora de Criação da Tarefa
+  - Data e Hora de Aprovação do Orçamento
+  - Data e Hora de Agendamento da Tarefa
+  - Data e Hora de Cancelamento da Tarefa
+  - Data e Hora de Conclusão da QA
+
+**Botão Designar Técnico**
+
+- Campos
+  - Técnico (menu suspenso)
+  - Habilidades (somente leitura)
+  - Agenda (somente leitura)
+  - Disponibilidade (calendário)
+  - Anotações de designação (campo de texto)
+  - Botão Notificar Técnico
+  - Botão Salvar
+  - Botão Cancelar
+- Mensagem de sucesso
+  - Técnico foi designado com sucesso.
+  - Técnico foi designado e notificado com sucesso.
+- Mensagem de erro
+  - Selecione um técnico antes de designar esta tarefa.
+  - O técnico selecionado não está disponível para esta tarefa.
+  - O técnico selecionado não foi designado para este tipo de serviço.
+  - O técnico não pode ser designado porque esta tarefa foi cancelada.
+  - Não foi possível designar o técnico. Por favor, tente novamente.
+- Mensagem de validação
+  - Técnico é obrigatório.
+  - As anotações de designação não devem exceder 500 caracteres.
+  - Técnico foi designado, mas a notificação não pôde ser enviada.
+
+**Botão Agendar Tarefa**
+
+- Campos
+  - Data Agendada (somente leitura)
+  - Horário de Agendamento (seletor de horário - dentro do horário disponível do cliente)
+  - Técnico Designado (menu suspenso)
+  - Anotações de agenda (campo de texto)
+  - Botão Notificar cliente
+  - Botão Notificar técnico
+  - Botão Salvar
+  - Botão Cancelar
+- Mensagem de erro
+  - O horário selecionado não está disponível. Por favor, escolha outro horário.
+  - O horário selecionado está fora da agenda disponível do cliente.
+  - O técnico selecionado não está disponível para este horário.
+  - O técnico selecionado tem um conflito de agenda. Por favor, selecione outro técnico.
+  - Não foi possível salvar as anotações da agenda. Por favor, tente novamente.
+- Mensagem de sucesso
+  - Cliente foi notificado com sucesso.
+  - Técnico foi notificado com sucesso.
+  - Tarefa foi agendada com sucesso.
+- Mensagem de validação
+  - Horário de agendamento é obrigatório.
+  - O horário deve estar dentro da agenda disponível do cliente.
+  - Técnico é obrigatório.
+  - Selecione um técnico antes de agendar a tarefa.
+  - As anotações da agenda não devem exceder 500 caracteres.
+
+**Botão Editar Orçamento**
+
+- Mensagem de confirmação
+  - Você será redirecionado para a página Editar Orçamento. Deseja continuar?
+- Mensagem de erro
+  - Não foi possível abrir a página Editar Orçamento. Por favor, tente novamente.
+
+**Botão Aprovar Orçamento**
+
+- Mensagem de confirmação
+  - Tem certeza de que deseja aprovar este orçamento?
+- Mensagem de sucesso
+  - Orçamento foi aprovado com sucesso.
+- Mensagem de erro
+  - Não foi possível aprovar o orçamento. Por favor, tente novamente.
+  - Este orçamento já foi aprovado.
+
+**Botão Enviar para o Cliente**
+
+- Mensagem de confirmação
+  - Tem certeza de que deseja enviar este orçamento ao cliente?
+- Mensagem de sucesso
+  - Orçamento foi enviado ao cliente com sucesso.
+- Mensagem de erro
+  - Não foi possível enviar um orçamento. Por favor, tente novamente.
+  - Este orçamento expirou. Por favor, atualize a data de expiração antes de enviar.
+  - Este orçamento deve ser aprovado antes de ser enviado ao cliente.
+
+**Botão Reenviar Orçamento**
+
+- Mensagem de confirmação
+  - Tem certeza de que deseja reenviar este orçamento ao cliente?
+- Mensagem de sucesso
+  - Orçamento foi reenviado ao cliente com sucesso.
+- Mensagem de erro
+  - Não foi possível reenviar o orçamento. Por favor, tente novamente.
+  - Este orçamento expirou. Por favor, atualize a data de expiração antes de reenviar.
+  - Este orçamento já foi aprovado pelo cliente e não pode ser reenviado.
+
+**Criar Tarefa Manualmente**
+
+- Campos
+  - Detalhes da Tarefa
+    - Campo de texto Título do Projeto (obrigatório)
+    - Menu suspenso Tipo de Serviço (obrigatório)
+    - Caixa de texto Descrição da Tarefa (obrigatório)
+    - Campo de texto Anotações internas (opcional)
+  - Informações do Cliente
+    - Caixa de seleção Cliente existente (opcional)
+   <w:t xml:space="preserve">   - Se o cliente for existente, o Nome do Cliente será um menu suspenso/campo de busca
+    - Campo de texto Nome do Cliente (obrigatório)
+    - Campo de texto E-mail do Cliente (opcional)
+    - Campo de texto Número de Telefone do Cliente (opcional)
+  - Informações da Propriedade
+    - Se o cliente existir, os campos da propriedade devem ser pré-preenchidos automaticamente
+    - Campo de texto Unidade/Apartamento/Sala (obrigatório)
+    - Campo de texto Cidade (obrigatório)
+    - Menu suspenso Estado (obrigatório)
+    - Campo de texto Código Postal (obrigatório)
+    - Caixa de texto Anotações da Propriedade (opcional)
+  - Detalhes da Agenda
+    - Seletor de calendário Data (obrigatório)
+    - Seletor de horário, menu suspenso ou campo de texto Horário (obrigatório)
+  - Anexos
+ <w:t xml:space="preserve">   - Campo de upload (opcional)
+  - Botão Salvar
+  - Botão Cancelar
+- Botão Salvar
+  - Tem certeza de que deseja criar esta tarefa?
+  - Tarefa foi criada com sucesso.
+  - Não foi possível criar a tarefa. Por favor, revise os campos obrigatórios e tente novamente.
+- Botão Cancelar
+  - Tem certeza de que deseja cancelar? Quaisquer detalhes da tarefa não salvos serão perdidos.
+- Mensagens dos campos Criar Tarefa
+  - Detalhes da Tarefa
+    - Mensagens de validação
+      - Tem certeza de que deseja cancelar? Quaisquer detalhes da tarefa não salvos serão perdidos.
+      - O título do projeto não deve exceder 100 caracteres.
+      - O tipo de serviço é obrigatório.
+      - A descrição da tarefa é obrigatória.
+      - A descrição da tarefa não deve exceder 1.000 caracteres.
+      - As anotações internas não devem exceder 1.000 caracteres.
+    - Mensagens de erro
+      - Não foi possível salvar o título do projeto. Por favor, tente novamente.
+      - Não foi possível carregar os tipos de serviço. Por favor, atualize e tente novamente.
+      - Não foi possível salvar a descrição da tarefa. Por favor, tente novamente.
+      - Não foi possível salvar as anotações internas. Por favor, tente novamente.
+  - Informações do Cliente
+    - Mensagens de validação
+      - Selecione um cliente existente.
+      - O nome do cliente é obrigatório.
+      - O nome do cliente não deve exceder 100 caracteres.
+      - Digite um endereço de e-mail válido.
+      - Digite um número de telefone válido.
+    - Mensagens de erro
+      - Não foi possível atualizar a seleção do cliente. Por favor, tente novamente.
+      - Não foi possível carregar os registros do cliente. Por favor, tente novamente.
+      - Não foi possível salvar o nome do cliente. Por favor, tente novamente.
+      - Não foi possível salvar o e-mail do cliente. Por favor, tente novamente.
+      - Não foi possível salvar o número de telefone do cliente. Por favor, tente novamente.
+    - Mensagens de lógica do cliente
+      - Detalhes do cliente foram carregados com sucesso.
+      - Nenhum cliente correspondente foi encontrado. Por favor, crie um novo cliente.
+      - Nenhuma propriedade salva foi encontrada para este cliente. Por favor, insira os detalhes da propriedade manualmente.
+      - Não foi possível pesquisar clientes. Por favor, tente novamente.
+  - Informações da Propriedade
+    - Mensagens de validação
+      - Unidade, apartamento ou sala é obrigatório.
+      - Cidade é obrigatória.
+      - Estado é obrigatório.
+      - Código postal é obrigatório.
+      - Digite um código postal válido.
+      - As anotações da propriedade não devem exceder 1.000 caracteres.
+    - Mensagens de erro
+      - Não foi possível carregar os detalhes da propriedade do cliente. Por favor, insira o endereço manualmente.
+      - Não foi possível salvar unidade, apartamento ou sala. Por favor, tente novamente.
+      - Não foi possível salvar a cidade. Por favor, tente novamente.
+      - Não foi possível carregar os estados. Por favor, atualize e tente novamente.
+      - Não foi possível validar o código postal. Por favor, tente novamente.
+      - Este código postal está fora da área de serviço suportada.
+      - Não foi possível salvar as anotações da propriedade. Por favor, tente novamente.
+  - Detalhes da Agenda
+    - Mensagens de validação
+      - A data de agendamento é obrigatória.
+      - O horário é obrigatório.
+      - Selecione um horário válido.
+      - O horário deve estar dentro da agenda disponível do cliente.
+    - Mensagens de erro
+      - Não foi possível salvar a data de agendamento. Por favor, tente novamente.
+      - A data selecionada não está disponível para agendamento.
+      - Não foi possível salvar o horário. Por favor, tente novamente.
+      - O horário selecionado não está mais disponível. Por favor, escolha outro horário.
+      - O horário selecionado está fora da agenda disponível do cliente.
+  - Anexos
+    - Mensagens de validação
+      - O tipo de arquivo não é suportado. Por favor, envie uma foto, vídeo ou documento.
+      - O tamanho do arquivo excede o limite permitido.
+      - Número máximo de anexos atingido.
+    - Mensagens de erro
+      - Não foi possível enviar o anexo. Por favor, tente novamente.
+      - O envio do anexo falhou. Por favor, verifique o arquivo e tente novamente.
+      - Um ou mais anexos não puderam ser enviados. Por favor, tente novamente.
+    - Mensagens de sucesso
+      - Anexo foi enviado com sucesso.
+      - Anexos foram enviados com sucesso.
+
+Página de Chats
+
+**Subpágina Chat por Cliente**
+
+- Cabeçalho
+  - Criar Chat
+- Filtros
+  - Campo de busca
+  - Status da Mensagem (não lida, lida)
+  - Tipo de Serviço
+  - Status da Tarefa
+  - Técnico Designado
+- Exibir no lado direito
+  - Opção de ordenação (crescente/decrescente por data)
+  - Nome do Cliente
+  - Data e Hora da última mensagem recebida
+  - Número de mensagens não lidas
+- Exibição do Chat Aberto (centro)
+  - Seção superior
+    - Nome do Cliente
+    - ID da Tarefa
+    - Título do Projeto
+    - Tipo de Serviço
+    - Status da Tarefa
+  - Ações da Caixa de Chat
+    - Caixa de chat
+    - Anexar Arquivos
+    - Botão Enviar
+- Exibir no lado esquerdo
+  - Participantes do Chat
+  - Informações Relacionadas
+    - Endereço da Propriedade
+    - Agenda
+    - Técnico Designado
+    - Última Atualização
+  - Ações do Chat
+    - Excluir
+    - Adicionar Técnico
+    - Remover Técnico
+    - Adicionar Administrador
+    - Remover Administrador
+    - Adicionar Cliente
+
+**Subpágina Chat por Tarefa**
+
+- Cabeçalho
+  - Criar Chat
+- Filtros
+  - Campo de busca
+  - Status da Mensagem (não lida, lida)
+  - Tipo de Serviço
+  - Status da Tarefa
+  - Técnico Designado
+- Exibir no lado direito
+  - Opção de ordenação (crescente/decrescente por data)
+  - ID da Tarefa
+  - Nome do Cliente
+  - Tipo de Serviço
+  - Data e Hora da última mensagem recebida
+  - Número de mensagens não lidas
+- Exibição do Chat Aberto (centro)
+  - Seção superior
+    - Nome do Cliente
+    - ID da Tarefa
+    - Título do Projeto
+    - Tipo de Serviço
+    - Status da Tarefa
+  - Ações da Caixa de Chat
+    - Caixa de chat
+    - Anexar Arquivos
+    - Botão Enviar
+- Exibir no lado esquerdo
+  - Participantes do Chat
+  - Informações Relacionadas
+    - Endereço da Propriedade
+    - Agenda
+    - Técnico Designado
+    - Última Atualização
+  - Ações do Chat
+    - Excluir
+    - Adicionar Técnico
+    - Remover Técnico
+    - Adicionar Administrador
+    - Remover Administrador
+    - Adicionar Cliente
