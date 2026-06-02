@@ -112,7 +112,7 @@ function TasksPage({ tasks, onOpenTask, onSchedule, onAssignTech, onCreateTask, 
               <th>Agendamento</th>
               <th>Técnico</th>
               <th style={{ width: 140 }}>Criada em</th>
-              <th style={{ width: 120, textAlign: "right" }}>Ações</th>
+              <th className="actions-head">Ações</th>
             </tr>
           </thead>
           <tbody>
@@ -149,24 +149,34 @@ function TasksPage({ tasks, onOpenTask, onSchedule, onAssignTech, onCreateTask, 
                 </td>
                 <td className="muted small mono">{t.dataCriacao.split(" ")[0]}</td>
                 <td className="actions-cell" onClick={(e) => e.stopPropagation()}>
-                  {!t.dataAgendada && t.status !== "Cancelado" ? (
-                    <button className="row-action" title="Agendar" onClick={() => onSchedule(t.id)}>
-                      <Icon.Calendar size={14}/>
-                    </button>
-                  ) : null}
-                  {!t.tecnico && t.status !== "Cancelado" ? (
-                    <button className="row-action" title="Designar técnico" onClick={() => onAssignTech(t.id)}>
-                      <Icon.UserPlus size={14}/>
-                    </button>
-                  ) : null}
-                  <button className="row-action" title="Abrir" onClick={() => onOpenTask(t.id)}>
-                    <Icon.ArrowRight size={14}/>
-                  </button>
-                  {t.status !== "Cancelado" && t.status !== "Concluído" ? (
-                    <button className="row-action danger" title="Cancelar" onClick={() => onCancelTask(t.id)}>
-                      <Icon.XCircle size={14}/>
-                    </button>
-                  ) : null}
+                  <div className="actions-toolbar">
+                    <div className="action-slot">
+                      {!t.dataAgendada && t.status !== "Cancelado" ? (
+                        <button type="button" className="row-action" title="Agendar" onClick={() => onSchedule(t.id)}>
+                          <Icon.Calendar size={14}/>
+                        </button>
+                      ) : null}
+                    </div>
+                    <div className="action-slot">
+                      {!t.tecnico && t.status !== "Cancelado" ? (
+                        <button type="button" className="row-action" title="Designar técnico" onClick={() => onAssignTech(t.id)}>
+                          <Icon.UserPlus size={14}/>
+                        </button>
+                      ) : null}
+                    </div>
+                    <div className="action-slot">
+                      <button type="button" className="row-action" title="Abrir" onClick={() => onOpenTask(t.id)}>
+                        <Icon.ArrowRight size={14}/>
+                      </button>
+                    </div>
+                    <div className="action-slot">
+                      {t.status !== "Cancelado" && t.status !== "Concluído" ? (
+                        <button type="button" className="row-action danger" title="Cancelar" onClick={() => onCancelTask(t.id)}>
+                          <Icon.XCircle size={14}/>
+                        </button>
+                      ) : null}
+                    </div>
+                  </div>
                 </td>
               </tr>
             ))}
@@ -386,6 +396,20 @@ function TaskDetail({ task, onAssignTech, onSchedule, onApproveQuote, onSendQuot
                   <div className="mono" style={{ color: "var(--gold)", fontSize: 15, fontWeight: 500 }}>{task.horario || "—"}</div>
                 </div>
               </div>
+              {task.dataAgendada ? (
+                <div className="kv-row" style={{ gridTemplateColumns: "1fr 1fr" }}>
+                  <div>
+                    <div className="k" style={{ fontSize: 10, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--fg-5)", marginBottom: 4 }}>Baia</div>
+                    <div className="mono" style={{ color: "var(--gold)", fontSize: 15, fontWeight: 500 }}>{task.baia ? `Baia ${task.baia}` : "—"}</div>
+                  </div>
+                  <div>
+                    <div className="k" style={{ fontSize: 10, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--fg-5)", marginBottom: 4 }}>Duração</div>
+                    <div className="mono" style={{ color: "var(--gold)", fontSize: 15, fontWeight: 500 }}>
+                      {task.duracaoHoras ? `${String(task.duracaoHoras).replace(".", ",")} h` : task.duracao ? `${task.duracao} min` : "—"}
+                    </div>
+                  </div>
+                </div>
+              ) : null}
               <div className="kv-row">
                 <span className="k">Técnico Designado</span>
                 <span className="v">
@@ -417,7 +441,7 @@ function TaskDetail({ task, onAssignTech, onSchedule, onApproveQuote, onSendQuot
                 <Button size="sm" icon={Icon.Calendar} onClick={() => onSchedule(task.id)}>Agendar tarefa</Button>
               ) : null}
               {task.tecnico && task.dataAgendada ? (
-                <Button variant="ghost" size="sm">Reagendar</Button>
+                <Button variant="ghost" size="sm" onClick={() => onSchedule(task.id)}>Reagendar</Button>
               ) : null}
             </div>
           </div>

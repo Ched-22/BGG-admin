@@ -1,6 +1,19 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { BGG_DATA } from "../../data/bggData";
 import { Button, Icon, Field, Input, Select, Textarea, Checkbox, Modal, useToast } from "../ui";
+import {
+  BAIAS,
+  DURATION_HOUR_OPTIONS,
+  DURATION_OTHER,
+  findBayConflict,
+  formatDurationHours,
+  getBlockedTimeSlots,
+  endsAfterClosing,
+  isPresetDurationHours,
+  minutesToTime,
+  parseTimeToMinutes,
+  resolveDurationHours,
+} from "../../lib/scheduling";
 
 // ----- Assign Technician -----
 function AssignTechModal({ open, task, onClose, onSave }) {
@@ -165,30 +178,74 @@ function AssignTechModal({ open, task, onClose, onSave }) {
 }
 
 // ----- Schedule Task -----
-function ScheduleModal({ open, task, onClose, onSave }) {
+function ScheduleModal({ open, task, tasks = [], events = [], defaultDate = "", onClose, onSave }) {
+  const [pickedTaskId, setPickedTaskId] = useState("");
   const [date, setDate] = useState("");
   const [time, setTime] = useState("");
   const [tech, setTech] = useState("");
+  const [baia, setBaia] = useState(1);
+  const [durationMode, setDurationMode] = useState("preset");
+  const [duracaoHoras, setDuracaoHoras] = useState(2);
+  const [customDuracaoHoras, setCustomDuracaoHoras] = useState("");
   const [notes, setNotes] = useState("");
   const [notifyCli, setNotifyCli] = useState(true);
   const [notifyTec, setNotifyTec] = useState(true);
   const [err, setErr] = useState({});
   const toast = useToast();
 
-  useEffect(() => {
-    if (open && task) {
-      setDate(task.dataAgendada || "2026-05-22");
-      setTime(task.horario || "");
-      setTech(task.tecnico || "");
-      setNotes("");
-      setErr({});
-    }
-  }, [open, task]);
+  const activeTask = task || tasks.find((t) => t.id === pickedTaskId) || null;
+  const schedulableTasks = tasks.filter(
+    (t) => t.status !== "Cancelado" && !t.dataAgendada
+  );
 
-  if (!open || !task) return null;
+  const applyDuration = (hours) => {
+    const h = hours || 2;
+    if (!isPresetDurationHours(h)) {
+      setDurationMode(DURATION_OTHER);
+      setCustomDuracaoHoras(String(h));
+      setDuracaoHoras(2);
+    } else {
+      setDurationMode("preset");
+      setDuracaoHoras(h);
+      setCustomDuracaoHoras("");
+    }
+  };
+
+  useEffect(() => {
+    if (!open) return;
+    const source = task || tasks.find((t) => t.id === pickedTaskId);
+    if (source) {
+      setDate(source.dataAgendada || defaultDate || "2026-05-22");
+      setTime(source.horario || "");
+      setTech(source.tecnico || "");
+      setBaia(source.baia || 1);
+      applyDuration(source.duracaoHoras);
+    } else {
+      setPickedTaskId("");
+      setDate(defaultDate || "2026-05-22");
+      setTime("");
+      setTech("");
+      setBaia(1);
+      applyDuration(2);
+    }
+    setNotes("");
+    setErr({});
+  }, [open, task, pickedTaskId, defaultDate, tasks]);
 
   const times = ["08:00","08:30","09:00","09:30","10:00","10:30","11:00","11:30","13:00","13:30","14:00","14:30","15:00","15:30","16:00","16:30","17:00","17:30"];
-  const busyTimes = ["11:00", "11:30", "13:00"]; // simulated availability
+  const activeTaskId = activeTask?.id;
+  const effectiveDuracaoHoras = resolveDurationHours({ durationMode, duracaoHoras, customDuracaoHoras });
+  const blockedTimes = useMemo(
+    () => (activeTaskId && date && effectiveDuracaoHoras > 0
+      ? getBlockedTimeSlots(events, { data: date, duracaoHoras: effectiveDuracaoHoras, baia, excludeId: activeTaskId }, times)
+      : []),
+    [events, date, effectiveDuracaoHoras, baia, activeTaskId]
+  );
+  const conflictAtSelection = activeTaskId && date && time && baia && effectiveDuracaoHoras > 0
+    ? findBayConflict(events, { data: date, horario: time, duracaoHoras: effectiveDuracaoHoras, baia }, activeTaskId)
+    : null;
+
+  if (!open) return null;
 
   // Build a simple calendar grid (May 2026)
   const month = [
@@ -202,25 +259,53 @@ function ScheduleModal({ open, task, onClose, onSave }) {
   const selDay = parseInt(date.split("-")[2], 10);
   const submit = () => {
     const next = {};
+    if (!activeTask) next.task = "Selecione a tarefa a agendar.";
     if (!date) next.date = "A data de agendamento é obrigatória.";
     if (!time) next.time = "Horário de agendamento é obrigatório.";
     if (!tech) next.tech = "Técnico é obrigatório.";
+    if (!baia) next.baia = "Selecione a baia.";
+    if (durationMode === DURATION_OTHER) {
+      if (!customDuracaoHoras) next.duracaoHoras = "Informe a quantidade de horas.";
+      else if (!effectiveDuracaoHoras || effectiveDuracaoHoras <= 8) {
+        next.duracaoHoras = "Em Outro, informe mais de 8 horas.";
+      }
+    } else if (!effectiveDuracaoHoras || effectiveDuracaoHoras <= 0) {
+      next.duracaoHoras = "Informe a duração do serviço.";
+    }
+    if (effectiveDuracaoHoras > 0 && endsAfterClosing(time, effectiveDuracaoHoras)) {
+      next.time = `O serviço termina após o fechamento (${minutesToTime(parseTimeToMinutes(time) + effectiveDuracaoHoras * 60)}).`;
+    }
+    if (activeTask && effectiveDuracaoHoras > 0) {
+      const conflict = findBayConflict(events, { data: date, horario: time, duracaoHoras: effectiveDuracaoHoras, baia }, activeTask.id);
+      if (conflict) {
+        next.time = `Baia ${baia} ocupada neste horário — conflito com ${conflict.title || conflict.id}.`;
+      }
+    }
     if (notes.length > 500) next.notes = "As anotações da agenda não devem exceder 500 caracteres.";
     setErr(next);
     if (Object.keys(next).length) return;
-    onSave(task.id, { dataAgendada: date, horario: time, tecnico: tech });
-    toast({ kind: "success", title: "Tarefa agendada", desc: `${task.id} · ${date} às ${time}` });
-    if (notifyCli) toast({ kind: "success", title: "Cliente notificado", desc: task.cliente });
+    onSave(activeTask.id, { dataAgendada: date, horario: time, tecnico: tech, baia, duracaoHoras: effectiveDuracaoHoras });
+    toast({
+      kind: "success",
+      title: "Tarefa agendada",
+      desc: `${activeTask.id} · ${date} ${time} · Baia ${baia} · ${formatDurationHours(effectiveDuracaoHoras)}`,
+    });
+    if (notifyCli) toast({ kind: "success", title: "Cliente notificado", desc: activeTask.cliente });
     if (notifyTec) toast({ kind: "success", title: "Técnico notificado", desc: tech });
     onClose();
   };
+
+  const modalTitle = task ? "Agendar Tarefa" : "Novo agendamento";
+  const modalSub = activeTask
+    ? `${activeTask.id} · ${activeTask.projeto} · ${activeTask.cliente}`
+    : "Selecione a tarefa e defina baia, duração e horário";
 
   return (
     <Modal
       open={open}
       onClose={onClose}
-      title="Agendar Tarefa"
-      sub={`${task.id} · ${task.projeto} · ${task.cliente}`}
+      title={modalTitle}
+      sub={modalSub}
       size="xl"
       footer={
         <>
@@ -264,15 +349,91 @@ function ScheduleModal({ open, task, onClose, onSave }) {
             </div>
           </Field>
 
-          <Field label="Horário" error={err.time} hint="Janela disponível do cliente: 09:00 — 18:00">
+          <Field label="Baia" error={err.baia}>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+              {BAIAS.map((b) => {
+                const sel = baia === b;
+                return (
+                  <button
+                    key={b}
+                    type="button"
+                    onClick={() => setBaia(b)}
+                    style={{
+                      border: `1px solid ${sel ? "var(--gold)" : "var(--border)"}`,
+                      background: sel ? "rgba(194,164,109,0.10)" : "var(--bg-elevated)",
+                      borderRadius: 4,
+                      padding: "12px 14px",
+                      textAlign: "left",
+                      color: sel ? "var(--gold)" : "var(--fg)",
+                      fontWeight: 500,
+                      fontSize: 13,
+                    }}
+                  >
+                    Baia {b}
+                  </button>
+                );
+              })}
+            </div>
+          </Field>
+
+          <Field
+            label="Duração do serviço"
+            error={err.duracaoHoras}
+            hint={durationMode === DURATION_OTHER
+              ? "Informe quantas horas a baia ficará reservada (acima de 8 h)"
+              : "Tempo em que a baia ficará reservada (até 8 h)"}
+          >
+            <div className="col" style={{ gap: 8 }}>
+              <Select
+                value={durationMode === DURATION_OTHER ? DURATION_OTHER : String(duracaoHoras)}
+                onChange={(e) => {
+                  if (e.target.value === DURATION_OTHER) {
+                    setDurationMode(DURATION_OTHER);
+                    if (!customDuracaoHoras || Number(customDuracaoHoras) <= 8) {
+                      setCustomDuracaoHoras("9");
+                    }
+                  } else {
+                    setDurationMode("preset");
+                    setDuracaoHoras(Number(e.target.value));
+                  }
+                }}
+                err={!!err.duracaoHoras}
+              >
+                {DURATION_HOUR_OPTIONS.map((h) => (
+                  <option key={h} value={h}>{formatDurationHours(h)}</option>
+                ))}
+                <option value={DURATION_OTHER}>Outro</option>
+              </Select>
+              {durationMode === DURATION_OTHER ? (
+                <Input
+                  type="number"
+                  min={8.5}
+                  step={0.5}
+                  value={customDuracaoHoras}
+                  onChange={(e) => setCustomDuracaoHoras(e.target.value)}
+                  placeholder="Quantidade de horas (ex: 10)"
+                  err={!!err.duracaoHoras}
+                />
+              ) : null}
+            </div>
+          </Field>
+
+          <Field
+            label="Horário"
+            error={err.time}
+            hint={conflictAtSelection
+              ? `Baia ${baia} indisponível — conflito com ${conflictAtSelection.title || conflictAtSelection.id}`
+              : "Horários em cinza: baia ocupada ou ultrapassam 18:00"}
+          >
             <div className="time-grid">
               {times.map(t => (
                 <button
                   key={t}
                   type="button"
                   className={`time-chip ${time === t ? "sel" : ""}`}
-                  disabled={busyTimes.includes(t)}
+                  disabled={blockedTimes.includes(t)}
                   onClick={() => setTime(t)}
+                  title={blockedTimes.includes(t) ? "Indisponível nesta baia" : undefined}
                 >{t}</button>
               ))}
             </div>
@@ -280,6 +441,21 @@ function ScheduleModal({ open, task, onClose, onSave }) {
         </div>
 
         <div className="col" style={{ gap: 16 }}>
+          {!task ? (
+            <Field label="Tarefa" error={err.task}>
+              <Select
+                value={pickedTaskId}
+                onChange={(e) => setPickedTaskId(e.target.value)}
+                err={!!err.task}
+              >
+                <option value="">Selecione uma tarefa não agendada</option>
+                {schedulableTasks.map((t) => (
+                  <option key={t.id} value={t.id}>{t.id} — {t.projeto} · {t.cliente}</option>
+                ))}
+              </Select>
+            </Field>
+          ) : null}
+
           <Field label="Técnico Designado" error={err.tech}>
             <Select value={tech} onChange={(e) => setTech(e.target.value)} err={!!err.tech}>
               <option value="">Selecione um técnico</option>
@@ -296,12 +472,20 @@ function ScheduleModal({ open, task, onClose, onSave }) {
                 <span className="mono" style={{ color: "var(--gold)", fontWeight: 500 }}>{date || "—"} · {time || "—"}</span>
               </div>
               <div className="row" style={{ justifyContent: "space-between", marginBottom: 8 }}>
+                <span className="tiny" style={{ color: "var(--fg-6)", letterSpacing: "0.1em", textTransform: "uppercase" }}>Baia · Duração</span>
+                <span className="mono" style={{ color: "var(--gold)", fontWeight: 500 }}>
+                  {baia ? `Baia ${baia}` : "—"} · {effectiveDuracaoHoras > 0 ? formatDurationHours(effectiveDuracaoHoras) : "—"}
+                </span>
+              </div>
+              <div className="row" style={{ justifyContent: "space-between", marginBottom: 8 }}>
                 <span className="tiny" style={{ color: "var(--fg-6)", letterSpacing: "0.1em", textTransform: "uppercase" }}>Cliente</span>
-                <span style={{ color: "var(--fg)" }}>{task.cliente}</span>
+                <span style={{ color: "var(--fg)" }}>{activeTask?.cliente || "—"}</span>
               </div>
               <div className="row" style={{ justifyContent: "space-between", marginBottom: 8 }}>
                 <span className="tiny" style={{ color: "var(--fg-6)", letterSpacing: "0.1em", textTransform: "uppercase" }}>Endereço</span>
-                <span className="muted small" style={{ textAlign: "right", maxWidth: "60%" }}>{task.endereco.cidade}/{task.endereco.estado}</span>
+                <span className="muted small" style={{ textAlign: "right", maxWidth: "60%" }}>
+                  {activeTask?.endereco ? `${activeTask.endereco.cidade}/${activeTask.endereco.estado}` : "—"}
+                </span>
               </div>
               <div className="row" style={{ justifyContent: "space-between" }}>
                 <span className="tiny" style={{ color: "var(--fg-6)", letterSpacing: "0.1em", textTransform: "uppercase" }}>Técnico</span>

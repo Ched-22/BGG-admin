@@ -112,7 +112,7 @@ function DashboardPage({ onNav, onOpenTask, onEditQuote, onApproveQuote, onSendQ
         <div className="titles">
           <span className="eyebrow-sm">Bom dia, Ana</span>
           <h2 className="page-title">Visão geral da operação</h2>
-          <div className="page-sub">{tasks.length} tarefas ativas · {D.quotesPending.length + D.quotesReady.length} orçamentos em aberto</div>
+          <div className="page-sub page-sub-bold">{tasks.length} tarefas ativas · {D.quotesPending.length + D.quotesReady.length} orçamentos em aberto</div>
         </div>
         <div className="row" style={{ gap: 10 }}>
           <Button variant="secondary" icon={Icon.RefreshCw}>Atualizar</Button>

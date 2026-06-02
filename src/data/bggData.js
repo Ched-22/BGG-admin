@@ -48,7 +48,7 @@ export const BGG_DATA = (() => {
       status: "Agendado",
       descricao: "Aplicação de proteção cerâmica completa. Veículo previamente polido, sem necessidade de correção de pintura. Cliente solicitou cobertura também em rodas e vidros.",
       endereco: { unidade: "Apto 1402, Torre B", logradouro: "Rua Itaim, 220", cidade: "São Paulo", estado: "SP", cep: "04535-080" },
-      dataAgendada: today, horario: "09:30",
+      dataAgendada: today, horario: "09:30", baia: 1, duracaoHoras: 1.5,
       dataCriacao: "2026-05-14 11:22",
       ultimaAtualizacao: "2026-05-20 16:45",
       tecnico: "Técnico 3",
@@ -129,7 +129,7 @@ export const BGG_DATA = (() => {
       status: "Sem técnico",
       descricao: "Proteção cerâmica completa após correção de pintura. Veículo deve permanecer 48h em ambiente controlado.",
       endereco: { unidade: "Garagem 12", logradouro: "Av. Oscar Freire, 1203", cidade: "São Paulo", estado: "SP", cep: "01426-001" },
-      dataAgendada: "2026-05-23", horario: "08:00",
+      dataAgendada: "2026-05-23", horario: "08:00", baia: 1, duracaoHoras: 8,
       dataCriacao: "2026-05-12 13:45",
       ultimaAtualizacao: "2026-05-19 09:00",
       tecnico: "",
@@ -155,7 +155,7 @@ export const BGG_DATA = (() => {
       status: "Pronto para QA",
       descricao: "Aplicação de película protetora em capô, paralamas dianteiros, faróis e retrovisores.",
       endereco: { unidade: "Box 14", logradouro: "Alameda Lorena, 401", cidade: "São Paulo", estado: "SP", cep: "01424-001" },
-      dataAgendada: "2026-05-19", horario: "08:30",
+      dataAgendada: "2026-05-19", horario: "08:30", baia: 2, duracaoHoras: 8,
       dataCriacao: "2026-05-08 10:05",
       ultimaAtualizacao: "2026-05-20 17:30",
       tecnico: "Técnico 1",
@@ -183,7 +183,7 @@ export const BGG_DATA = (() => {
       status: "Agendado",
       descricao: "Hidratação, limpeza profunda e proteção UV para bancos, painel e volante em couro natural.",
       endereco: { unidade: "Casa", logradouro: "Av. Brasil, 1500", cidade: "São Paulo", estado: "SP", cep: "01430-001" },
-      dataAgendada: today, horario: "14:00",
+      dataAgendada: today, horario: "14:00", baia: 2, duracaoHoras: 2,
       dataCriacao: "2026-05-15 16:20",
       ultimaAtualizacao: "2026-05-19 11:00",
       tecnico: "Técnico 5",
@@ -227,7 +227,7 @@ export const BGG_DATA = (() => {
       status: "Agendado",
       descricao: "Detalhamento completo Ducati Panigale. Atenção a quadro de carbono e detalhes anodizados.",
       endereco: { unidade: "Garagem 3", logradouro: "Rua Joaquim Floriano, 72", cidade: "São Paulo", estado: "SP", cep: "04534-000" },
-      dataAgendada: today, horario: "16:30",
+      dataAgendada: today, horario: "16:30", baia: 1, duracaoHoras: 1.5,
       dataCriacao: "2026-05-13 10:00",
       ultimaAtualizacao: "2026-05-19 18:22",
       tecnico: "Técnico 2",
@@ -317,37 +317,21 @@ export const BGG_DATA = (() => {
     { id: "ORC-10374", projeto: "PPF — Range Rover (cobertura total)", cliente: "Cliente 30", servico: "PPF — Película Protetora", endereco: "Rua Haddock Lobo, 800 — São Paulo, SP", valor: 24800, idade: "—", status: "Expirado", dataCriacao: "2026-04-02", validade: "2026-05-02", responsavel: "Ana Coordenadora" },
   ];
 
-  // ---------- Calendar events derived from tasks ----------
-  const calendarEvents = tasks
-    .filter(t => t.dataAgendada && t.status !== "Cancelado")
-    .map(t => ({
-      id: t.id,
-      title: t.projeto,
-      cliente: t.cliente,
-      servico: t.servico,
-      tecnico: t.tecnico,
-      data: t.dataAgendada,
-      horario: t.horario,
-      duracao: 90,
-      status: t.status,
-      endereco: t.endereco,
-    }));
-  // Add a couple of future ones for visual richness
-  ["2026-05-22","2026-05-22","2026-05-23","2026-05-24","2026-05-26","2026-05-27","2026-05-28","2026-05-29"].forEach((d, i) => {
-    calendarEvents.push({
-      id: "TR-" + (2850 + i),
-      title: ["Polimento Mercedes AMG", "Vitrificação Porsche 911", "PPF — Lamborghini Huracán", "Detalhamento Aston Martin", "Proteção cerâmica BMW M3", "Tratamento couro Range Rover", "Detalhamento Ducati Streetfighter", "Polimento Mustang GT"][i],
-      cliente: `Cliente ${30 + (i % 5)}`,
-      servico: ["Polimento e Vitrificação","Proteção Cerâmica","PPF — Película Protetora","Detalhamento Exterior","Proteção Cerâmica","Tratamento de Couro","Detalhamento Motos","Polimento e Vitrificação"][i],
-      tecnico: `Técnico ${1 + (i % 8)}`,
-      data: d,
-      horario: ["09:00","14:00","08:30","10:00","11:00","15:30","13:00","09:30"][i],
-      duracao: 120,
-      status: "Agendado",
-      endereco: { unidade: "—", logradouro: "—", cidade: "São Paulo", estado: "SP", cep: "—" },
-    });
+  // Eventos extras do calendário (demonstração; mesclados no App via buildCalendarEvents)
+  const seedCalendarExtras = [
+    { id: "TR-2850", title: "Polimento Mercedes AMG", cliente: "Cliente 30", servico: "Polimento e Vitrificação", tecnico: "Técnico 1", data: "2026-05-22", horario: "09:00", baia: 1, duracaoHoras: 3, status: "Agendado", endereco: { unidade: "—", logradouro: "—", cidade: "São Paulo", estado: "SP", cep: "—" } },
+    { id: "TR-2851", title: "Vitrificação Porsche 911", cliente: "Cliente 31", servico: "Proteção Cerâmica", tecnico: "Técnico 2", data: "2026-05-22", horario: "14:00", baia: 2, duracaoHoras: 2, status: "Agendado", endereco: { unidade: "—", logradouro: "—", cidade: "São Paulo", estado: "SP", cep: "—" } },
+    { id: "TR-2852", title: "PPF — Lamborghini Huracán", cliente: "Cliente 32", servico: "PPF — Película Protetora", tecnico: "Técnico 7", data: "2026-05-23", horario: "08:30", baia: 2, duracaoHoras: 4, status: "Agendado", endereco: { unidade: "—", logradouro: "—", cidade: "São Paulo", estado: "SP", cep: "—" } },
+    { id: "TR-2853", title: "Detalhamento Aston Martin", cliente: "Cliente 33", servico: "Detalhamento Exterior", tecnico: "Técnico 3", data: "2026-05-24", horario: "10:00", baia: 1, duracaoHoras: 2, status: "Agendado", endereco: { unidade: "—", logradouro: "—", cidade: "São Paulo", estado: "SP", cep: "—" } },
+    { id: "TR-2854", title: "Proteção cerâmica BMW M3", cliente: "Cliente 34", servico: "Proteção Cerâmica", tecnico: "Técnico 4", data: "2026-05-26", horario: "11:00", baia: 2, duracaoHoras: 1.5, status: "Agendado", endereco: { unidade: "—", logradouro: "—", cidade: "São Paulo", estado: "SP", cep: "—" } },
+    { id: "TR-2855", title: "Tratamento couro Range Rover", cliente: "Cliente 35", servico: "Tratamento de Couro", tecnico: "Técnico 5", data: "2026-05-27", horario: "15:30", baia: 1, duracaoHoras: 2, status: "Agendado", endereco: { unidade: "—", logradouro: "—", cidade: "São Paulo", estado: "SP", cep: "—" } },
+    { id: "TR-2856", title: "Detalhamento Ducati Streetfighter", cliente: "Cliente 36", servico: "Detalhamento Motos", tecnico: "Técnico 8", data: "2026-05-28", horario: "13:00", baia: 2, duracaoHoras: 2, status: "Agendado", endereco: { unidade: "—", logradouro: "—", cidade: "São Paulo", estado: "SP", cep: "—" } },
+    { id: "TR-2857", title: "Polimento Mustang GT", cliente: "Cliente 37", servico: "Polimento e Vitrificação", tecnico: "Técnico 1", data: "2026-05-29", horario: "09:30", baia: 1, duracaoHoras: 2.5, status: "Agendado", endereco: { unidade: "—", logradouro: "—", cidade: "São Paulo", estado: "SP", cep: "—" } },
+  ];
+  seedCalendarExtras.forEach((e) => {
+    e.duracao = Math.round((e.duracaoHoras || 1.5) * 60);
+    if (!e.servico) e.servico = serviceTypes[2];
   });
-  calendarEvents.forEach(e => { if (!e.servico) e.servico = serviceTypes[2]; });
 
   // ---------- Estoque (capacidadeMaxima = teto do depósito; <20% = compra urgente) ----------
   const inventoryProducts = [
@@ -378,7 +362,7 @@ export const BGG_DATA = (() => {
     quotesPending, quotesReady, quotes,
     tasks, techs, alerts,
     inventoryProducts,
-    customers, calendarEvents,
+    customers, seedCalendarExtras,
     today,
   };
 })();

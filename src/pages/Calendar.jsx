@@ -1,6 +1,8 @@
 import React, { useState, Fragment } from "react";
 import { BGG_DATA } from "../data/bggData";
-import { Button, Icon, Field, Input, Select, Modal } from "../components/ui";
+import { Button, Icon } from "../components/ui";
+import { ScheduleModal } from "../components/modals/TaskModals";
+import { formatDurationHours } from "../lib/scheduling";
 
 const PT_MONTHS = ["Janeiro","Fevereiro","Março","Abril","Maio","Junho","Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"];
 const PT_DOW_LONG = ["Domingo","Segunda","Terça","Quarta","Quinta","Sexta","Sábado"];
@@ -16,8 +18,7 @@ function serviceClass(s) {
   return "";
 }
 
-function CalendarPage({ onOpenTask }) {
-  const events = BGG_DATA.calendarEvents;
+function CalendarPage({ onOpenTask, events = [], tasks = [], onSaveSchedule }) {
   // Default to May 2026
   const [cursor, setCursor] = useState({ y: 2026, m: 4 }); // m is 0-indexed
   const [view, setView] = useState("month"); // month | week | day
@@ -190,7 +191,9 @@ function CalendarPage({ onOpenTask }) {
                   </div>
                   <div style={{ minWidth: 0 }}>
                     <div className="ttl">{e.title}</div>
-                    <div className="sub" style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{e.cliente} · {e.servico}</div>
+                    <div className="sub" style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      Baia {e.baia ?? 1} · {formatDurationHours(e.duracaoHoras ?? (e.duracao ? e.duracao / 60 : 1.5))} · {e.cliente}
+                    </div>
                     <div className="row" style={{ gap: 6, marginTop: 4 }}>
                       {e.tecnico ? <span className="tag" style={{ fontSize: 9, padding: "1px 5px" }}>{e.tecnico}</span> : null}
                       <span className="tag" style={{ fontSize: 9, padding: "1px 5px" }}>{e.id}</span>
@@ -205,10 +208,10 @@ function CalendarPage({ onOpenTask }) {
           <div>
             {view === "month" ? (
               <div className="cal-month">
-                <div className="cal-month-head">
-                  {PT_DOW_SHORT.map(d => <div key={d} className="dow">{d}</div>)}
-                </div>
                 <div className="cal-month-grid">
+                  {PT_DOW_SHORT.map(d => (
+                    <div key={d} className="cell head dow">{d}</div>
+                  ))}
                   {days.map((d, i) => {
                     const iso = formatISO(d);
                     const dayEvs = eventsForDay(iso);
@@ -218,7 +221,7 @@ function CalendarPage({ onOpenTask }) {
                     return (
                       <div
                         key={i}
-                        className={`cal-day ${!inMonth ? "other-month" : ""} ${isToday ? "today" : ""} ${sel ? "selected" : ""}`}
+                        className={`cell cal-day ${!inMonth ? "other-month" : ""} ${isToday ? "today" : ""} ${sel ? "selected" : ""}`}
                         onClick={() => setSelectedDate(iso)}
                       >
                         <div className="num">
@@ -230,10 +233,10 @@ function CalendarPage({ onOpenTask }) {
                             key={e.id}
                             className={`ev ${serviceClass(e.servico) || "s-cer"}`}
                             onClick={(ev) => { ev.stopPropagation(); onOpenTask(e.id); }}
-                            title={`${e.horario} · ${e.title}`}
+                            title={`${e.horario} · Baia ${e.baia ?? 1} · ${e.title}`}
                           >
                             <span className="time">{e.horario}</span>
-                            {e.title}
+                            B{e.baia ?? 1} · {e.title}
                           </div>
                         ))}
                         {dayEvs.length > 3 ? <div className="more">+{dayEvs.length - 3} mais</div> : null}
@@ -243,41 +246,53 @@ function CalendarPage({ onOpenTask }) {
                 </div>
               </div>
             ) : (
-              // Week view
               <div className="cal-week">
-                <div className="cal-week-grid" style={{ gridTemplateRows: `60px repeat(${hours.length}, 56px)` }}>
-                  <div className="cell head"></div>
+                <div className="cal-week-grid">
+                  <div className="cell head corner" aria-hidden="true" />
                   {weekDays.map((d, i) => {
                     const iso = formatISO(d);
                     const isToday = iso === todayISO;
+                    const isSelected = iso === selectedDate;
                     return (
-                      <div key={i} className={`cell head ${isToday ? "today" : ""}`} onClick={() => setSelectedDate(iso)} style={{ cursor: "pointer" }}>
+                      <button
+                        key={i}
+                        type="button"
+                        className={`cell head dow ${isToday ? "today" : ""} ${isSelected ? "selected" : ""}`}
+                        onClick={() => setSelectedDate(iso)}
+                      >
                         <span>{PT_DOW_SHORT[d.getDay()]}</span>
                         <span className="day-num">{d.getDate()}</span>
-                      </div>
+                      </button>
                     );
                   })}
-                  {hours.map((h, hi) => (
+                  {hours.map((h) => (
                     <Fragment key={h}>
                       <div className="cell t">{String(h).padStart(2, "0")}:00</div>
                       {weekDays.map((d, di) => {
                         const iso = formatISO(d);
+                        const isToday = iso === todayISO;
+                        const isSelected = iso === selectedDate;
                         const evHere = eventsForDay(iso).filter(e => parseInt(e.horario.split(":")[0], 10) === h);
                         return (
-                          <div key={di} className="cell" style={{ background: iso === todayISO ? "rgba(194,164,109,0.03)" : "transparent" }}>
-                            {evHere.map((e, ei) => {
+                          <div
+                            key={di}
+                            className={`cell slot ${isToday ? "today" : ""} ${isSelected ? "selected" : ""}`}
+                            onClick={() => setSelectedDate(iso)}
+                          >
+                            {evHere.map((e) => {
                               const mins = parseInt(e.horario.split(":")[1] || "0", 10);
-                              const top = (mins / 60) * 56;
-                              const height = (e.duracao / 60) * 56 - 2;
+                              const topPct = (mins / 60) * 100;
+                              const heightPct = Math.min((e.duracao / 60) * 100, 100 - topPct) - 1;
                               return (
                                 <div
                                   key={e.id}
-                                  className={`cal-week-event ${serviceClass(e.servico) || "s-cer"}`}
-                                  style={{ top: top + 2, height }}
-                                  onClick={() => onOpenTask(e.id)}
+                                  className={`ev ${serviceClass(e.servico) || "s-cer"}`}
+                                  style={{ top: `calc(${topPct}% + 2px)`, height: `max(${heightPct}%, 18px)` }}
+                                  onClick={(ev) => { ev.stopPropagation(); onOpenTask(e.id); }}
+                                  title={`${e.horario} · Baia ${e.baia ?? 1} · ${e.title}`}
                                 >
-                                  <div className="ev-title">{e.horario} · {e.title.split(" — ")[0]}</div>
-                                  <div className="ev-meta">{e.cliente} · {e.tecnico || "Sem técnico"}</div>
+                                  <span className="time">{e.horario}</span>
+                                  B{e.baia ?? 1} · {e.title}
                                 </div>
                               );
                             })}
@@ -293,39 +308,15 @@ function CalendarPage({ onOpenTask }) {
         </div>
       </div>
 
-      <Modal
+      <ScheduleModal
         open={showCreate}
+        task={null}
+        tasks={tasks}
+        events={events}
+        defaultDate={selectedDate}
         onClose={() => setShowCreate(false)}
-        title="Novo agendamento"
-        sub="Vincule a uma tarefa existente ou crie uma nova"
-        footer={
-          <>
-            <Button variant="ghost" onClick={() => setShowCreate(false)}>Cancelar</Button>
-            <Button icon={Icon.Calendar} onClick={() => setShowCreate(false)}>Agendar</Button>
-          </>
-        }
-      >
-        <div className="col" style={{ gap: 14 }}>
-          <Field label="Tarefa">
-            <Select defaultValue="">
-              <option value="">Selecione uma tarefa não agendada</option>
-              {BGG_DATA.tasks.filter(t => !t.dataAgendada).map(t => (
-                <option key={t.id} value={t.id}>{t.id} — {t.projeto}</option>
-              ))}
-            </Select>
-          </Field>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-            <Field label="Data"><Input type="date" defaultValue={selectedDate}/></Field>
-            <Field label="Horário"><Input type="time" defaultValue="09:00"/></Field>
-          </div>
-          <Field label="Técnico">
-            <Select defaultValue="">
-              <option value="">Selecione um técnico</option>
-              {BGG_DATA.techs.map(t => <option key={t.name}>{t.name}</option>)}
-            </Select>
-          </Field>
-        </div>
-      </Modal>
+        onSave={onSaveSchedule}
+      />
     </>
   );
 }

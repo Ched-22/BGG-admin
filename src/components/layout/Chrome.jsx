@@ -1,6 +1,5 @@
 import React, { Fragment } from "react";
 import { Icon, Brand, Button } from "../ui";
-import ThemeToggle from "./ThemeToggle";
 
 const NAV_SECTIONS = [
   {
@@ -26,7 +25,7 @@ function Sidebar({ route, onNav, collapsed, onToggleCollapsed, onLogout }) {
   return (
     <aside className="sidebar" data-collapsed={collapsed}>
       <div className="sidebar-logo">
-        <Brand size={collapsed ? 18 : 22}/>
+        <Brand size={collapsed ? 18 : 22} compact={collapsed}/>
       </div>
       <nav className="sidebar-nav">
         {NAV_SECTIONS.map((sec) => (
@@ -55,15 +54,23 @@ function Sidebar({ route, onNav, collapsed, onToggleCollapsed, onLogout }) {
         ))}
       </nav>
       <div className="sidebar-foot">
-        <div className="avatar">A</div>
-        <div className="me" style={{ display: "flex", flexDirection: "column", flex: 1, minWidth: 0 }}>
-          <span style={{ fontSize: 12.5, color: "var(--fg)", fontWeight: 500 }}>Ana Coordenadora</span>
-          <span style={{ fontSize: 10, color: "var(--fg-6)", letterSpacing: "0.1em", textTransform: "uppercase" }}>Admin</span>
-        </div>
-        <button className="collapse-btn me" onClick={onLogout} title="Sair">
-          <Icon.LogOut size={14}/>
-        </button>
-        <button className="collapse-btn" onClick={onToggleCollapsed} title={collapsed ? "Expandir" : "Recolher"}>
+        <div className="avatar" title="Ana Coordenadora">A</div>
+        {!collapsed ? (
+          <>
+            <div className="me">
+              <span className="me-name">Ana Coordenadora</span>
+              <span className="me-role">Admin</span>
+            </div>
+            <button type="button" className="collapse-btn" onClick={onLogout} title="Sair">
+              <Icon.LogOut size={14}/>
+            </button>
+          </>
+        ) : (
+          <button type="button" className="collapse-btn" onClick={onLogout} title="Sair">
+            <Icon.LogOut size={14}/>
+          </button>
+        )}
+        <button type="button" className="collapse-btn" onClick={onToggleCollapsed} title={collapsed ? "Expandir" : "Recolher"}>
           {collapsed ? <Icon.Chevron size={14}/> : <Icon.PanelLeft size={14}/>}
         </button>
       </div>
@@ -71,7 +78,7 @@ function Sidebar({ route, onNav, collapsed, onToggleCollapsed, onLogout }) {
   );
 }
 
-function TopBar({ route, onNav, onTweaks }) {
+function TopBar({ route, onNav }) {
   const titles = {
     dashboard: { eye: "Console Operacional", title: "Dashboard" },
     tasks: { eye: "Operações", title: "Tarefas Abertas" },
@@ -121,13 +128,9 @@ function TopBar({ route, onNav, onTweaks }) {
           <span style={{ color: "var(--fg-6)", fontSize: 10, letterSpacing: "0.08em", border: "1px solid var(--border)", padding: "2px 4px", borderRadius: 2 }}>⌘ K</span>
         </div>
       )}
-      <ThemeToggle />
       <button className="icon-btn" title="Notificações">
         <Icon.Bell size={18}/>
         <span className="dot"></span>
-      </button>
-      <button className="icon-btn" title="Tweaks" onClick={onTweaks}>
-        <Icon.Sparkles size={18}/>
       </button>
       <div style={{ width: 1, alignSelf: "stretch", margin: "12px 4px", background: "var(--border)" }}/>
       <div className="avatar" title="Ana Coordenadora">A</div>

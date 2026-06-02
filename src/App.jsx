@@ -1,9 +1,7 @@
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import { BGG_DATA } from "./data/bggData";
-import { useToast, useConfirm, Button, Icon } from "./components/ui";
-import { useTweaks, TweaksPanel, TweakSection, TweakToggle } from "./components/tweaks/TweaksPanel";
-import { useTheme } from "./context/ThemeContext";
-import ThemeToggle from "./components/layout/ThemeToggle";
+import { buildCalendarEvents } from "./lib/scheduling";
+import { useToast, useConfirm } from "./components/ui";
 import { LoginScreen, RegisterScreen, ForgotScreen, ResetScreen } from "./pages/auth";
 import { Sidebar, TopBar } from "./components/layout/Chrome";
 import { DashboardPage } from "./pages/Dashboard";
@@ -14,12 +12,6 @@ import { CustomersPage } from "./pages/Customers";
 import { TechniciansPage } from "./pages/Technicians";
 import { QuotesPage } from "./pages/Quotes";
 import { StockPage } from "./pages/Stock";
-
-const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
-  "sidebarCollapsed": false,
-  "showActivityToasts": true,
-  "demoBanner": true
-}/*EDITMODE-END*/;
 
 function App() {
   const [authed, setAuthed] = useState(true); // start logged in by default
@@ -34,10 +26,12 @@ function App() {
   const [scheduleFor, setScheduleFor] = useState(null);
   const [showCreate, setShowCreate] = useState(false);
   const [confirm, ConfirmEl] = useConfirm();
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
-  // Tweaks
-  const [tweaks, setTweak] = useTweaks(TWEAK_DEFAULTS);
-  const { theme, setTheme } = useTheme();
+  const calendarEvents = useMemo(
+    () => buildCalendarEvents(tasks, BGG_DATA.seedCalendarExtras),
+    [tasks]
+  );
 
   const toast = useToast();
 
@@ -71,10 +65,14 @@ function App() {
   };
   const saveSchedule = (id, payload) => {
     const cur = tasks.find(t => t.id === id);
+    const duracaoHoras = Number(payload.duracaoHoras);
     updateTask(id, {
       dataAgendada: payload.dataAgendada,
       horario: payload.horario,
       tecnico: payload.tecnico,
+      baia: Number(payload.baia),
+      duracaoHoras,
+      duracao: Math.round(duracaoHoras * 60),
       tecnicoStatus: "Confirmado",
       status: cur.status === "Não agendado" || cur.status === "Sem técnico" || cur.status === "Aguardando orçamento" ? "Agendado" : cur.status,
     });
@@ -178,7 +176,6 @@ function App() {
       : <ResetScreen onAuthed={onAuthed} onGo={goAuth}/>;
     return (
       <div className="auth-shell">
-        <div className="auth-theme-fab"><ThemeToggle showLabel /></div>
         {authScreen}
       </div>
     );
@@ -187,38 +184,16 @@ function App() {
   const task = route.page === "task-detail" ? tasks.find(t => t.id === route.taskId) : null;
 
   return (
-    <div className="app-root" data-collapsed={tweaks.sidebarCollapsed}>
+    <div className="app-root" data-collapsed={sidebarCollapsed}>
       <Sidebar
         route={route}
         onNav={nav}
-        collapsed={tweaks.sidebarCollapsed}
-        onToggleCollapsed={() => setTweak("sidebarCollapsed", !tweaks.sidebarCollapsed)}
+        collapsed={sidebarCollapsed}
+        onToggleCollapsed={() => setSidebarCollapsed((c) => !c)}
         onLogout={() => { setAuthed(false); setAuthRoute("login"); }}
       />
       <div className="main-col">
-        <TopBar route={route} onNav={nav} onTweaks={() => window.parent.postMessage({ type: "__edit_mode_available" }, "*")}/>
-
-        {tweaks.demoBanner ? (
-          <div style={{
-            background: "linear-gradient(90deg, rgba(194,164,109,0.12), rgba(194,164,109,0.04))",
-            borderBottom: "1px solid var(--gold-30)",
-            padding: "8px 24px",
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            fontSize: 11,
-            color: "var(--fg-4)",
-            letterSpacing: "0.04em"
-          }}>
-            <div className="row" style={{ gap: 8 }}>
-              <span style={{ color: "var(--gold)" }}><Icon.Info size={12}/></span>
-              <span>Protótipo navegável · todos os dados são fictícios. Clique nas linhas, modais e botões para explorar.</span>
-            </div>
-            <button onClick={() => setTweak("demoBanner", false)} style={{ color: "var(--fg-6)" }}>
-              <Icon.Close size={12}/>
-            </button>
-          </div>
-        ) : null}
+        <TopBar route={route} onNav={nav}/>
 
         {route.page === "dashboard" ? (
           <DashboardPage
@@ -261,7 +236,12 @@ function App() {
         ) : null}
 
         {route.page === "calendar" ? (
-          <CalendarPage onOpenTask={openTask}/>
+          <CalendarPage
+            onOpenTask={openTask}
+            events={calendarEvents}
+            tasks={tasks}
+            onSaveSchedule={saveSchedule}
+          />
         ) : null}
 
         {route.page === "customers" ? (
@@ -290,6 +270,7 @@ function App() {
       <ScheduleModal
         open={!!scheduleFor}
         task={tasks.find(t => t.id === scheduleFor)}
+        events={calendarEvents}
         onClose={() => setScheduleFor(null)}
         onSave={saveSchedule}
       />
@@ -299,42 +280,6 @@ function App() {
         onCreate={onCreate}
       />
       {ConfirmEl}
-
-      {/* Tweaks panel */}
-      <TweaksPanel title="Tweaks">
-        <TweakSection label="Layout"/>
-        <TweakToggle label="Tema claro" value={theme === "light"} onChange={(v) => setTheme(v ? "light" : "dark")}/>
-        <TweakToggle label="Sidebar recolhida (só ícones)" value={tweaks.sidebarCollapsed} onChange={(v) => setTweak("sidebarCollapsed", v)}/>
-        <TweakToggle label="Banner de protótipo" value={tweaks.demoBanner} onChange={(v) => setTweak("demoBanner", v)}/>
-
-        <TweakSection label="Navegação rápida"/>
-        <div className="col" style={{ gap: 6, padding: "0 0 8px" }}>
-          <Button size="sm" variant="ghost" onClick={() => nav({ page: "dashboard" })}>→ Dashboard</Button>
-          <Button size="sm" variant="ghost" onClick={() => nav({ page: "tasks" })}>→ Tarefas Abertas</Button>
-          <Button size="sm" variant="ghost" onClick={() => openTask("TR-2841")}>→ Tarefa TR-2841 (Hoje)</Button>
-          <Button size="sm" variant="ghost" onClick={() => openTask("TR-2837")}>→ Tarefa TR-2837 (QA)</Button>
-          <Button size="sm" variant="ghost" onClick={() => nav({ page: "calendar" })}>→ Calendário</Button>
-          <Button size="sm" variant="ghost" onClick={() => nav({ page: "customers" })}>→ Clientes</Button>
-          <Button size="sm" variant="ghost" onClick={() => nav({ page: "technicians" })}>→ Técnicos</Button>
-          <Button size="sm" variant="ghost" onClick={() => nav({ page: "quotes" })}>→ Orçamentos</Button>
-          <Button size="sm" variant="ghost" onClick={() => nav({ page: "stock" })}>→ Estoque</Button>
-        </div>
-
-        <TweakSection label="Telas de autenticação"/>
-        <div className="col" style={{ gap: 6, padding: "0 0 8px" }}>
-          <Button size="sm" variant="ghost" onClick={() => { setAuthed(false); setAuthRoute("login"); }}>→ Login</Button>
-          <Button size="sm" variant="ghost" onClick={() => { setAuthed(false); setAuthRoute("register"); }}>→ Registro</Button>
-          <Button size="sm" variant="ghost" onClick={() => { setAuthed(false); setAuthRoute("forgot"); }}>→ Esqueci minha senha</Button>
-          <Button size="sm" variant="ghost" onClick={() => { setAuthed(false); setAuthRoute("reset"); }}>→ Redefinir senha</Button>
-        </div>
-
-        <TweakSection label="Modais"/>
-        <div className="col" style={{ gap: 6, padding: "0 0 8px" }}>
-          <Button size="sm" variant="ghost" onClick={() => setShowCreate(true)}>→ Criar Tarefa</Button>
-          <Button size="sm" variant="ghost" onClick={() => onAssignTech("TR-2838")}>→ Designar Técnico</Button>
-          <Button size="sm" variant="ghost" onClick={() => onSchedule("TR-2839")}>→ Agendar Tarefa</Button>
-        </div>
-      </TweaksPanel>
     </div>
   );
 }

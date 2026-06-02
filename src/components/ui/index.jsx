@@ -229,21 +229,17 @@ function useConfirm() {
 const fmtBRL = (n) => "R$ " + (n || 0).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 // ---------- Logo wordmark ----------
-function Brand({ size = 22, stacked = true }) {
+function Brand({ size = 22, stacked = true, compact = false }) {
   return (
-    <>
+    <div className="brand">
       <span className="mark" style={{ fontSize: size }}>BGG</span>
-      {stacked ? (
-        <div className="stack" style={{ display: "flex", flexDirection: "column" }}>
-          <span style={{ fontSize: 10, color: "var(--fg)", letterSpacing: "0.18em", textTransform: "uppercase", fontWeight: 500 }}>
-            Black Gold Garage
-          </span>
-          <span style={{ fontSize: 8, color: "var(--fg-6)", letterSpacing: "0.22em", textTransform: "uppercase", marginTop: 2 }}>
-            Admin Console
-          </span>
+      {stacked && !compact ? (
+        <div className="stack">
+          <span className="brand-name">Black Gold Garage</span>
+          <span className="brand-sub">Admin Console</span>
         </div>
       ) : null}
-    </>
+    </div>
   );
 }
 
