@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from "react";
 import { Button, Field, Input, Checkbox, Brand, Icon } from "../components/ui";
+import api from "../lib/api";
 
 function AuthArt({ caption }) {
   return (
@@ -31,7 +32,7 @@ function LoginScreen({ onAuthed, onGo }) {
   const [generic, setGeneric] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const submit = (e) => {
+  const submit = async (e) => {
     e.preventDefault();
     const next = {};
     if (!email) next.email = "Endereço de e-mail é obrigatório";
@@ -44,10 +45,16 @@ function LoginScreen({ onAuthed, onGo }) {
     }
     setGeneric("");
     setLoading(true);
-    setTimeout(() => {
+    try {
+      const { data } = await api.post('/auth/login', { email, password: senha });
+      localStorage.setItem('bgg-token', data.access_token);
+      localStorage.setItem('bgg-user', JSON.stringify(data.user));
+      onAuthed && onAuthed(data.user);
+    } catch (err) {
+      setGeneric("E-mail ou senha incorretos. Tente novamente.");
+    } finally {
       setLoading(false);
-      onAuthed && onAuthed({ email });
-    }, 700);
+    }
   };
 
   return (

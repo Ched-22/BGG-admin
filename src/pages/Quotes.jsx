@@ -1,6 +1,8 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { BGG_DATA } from "../data/bggData";
 import { Button, Icon, Field, Input, Select, Modal, StatusBadge, fmtBRL, useToast, useConfirm } from "../components/ui";
+import api from "../lib/api";
+import { mapQuoteFromApi } from "../lib/quoteApi";
 
 const QUOTE_STATUSES = ["Todos", "Pendente", "Pronto para envio", "Enviado", "Aprovado", "Rejeitado", "Expirado"];
 const QUOTE_TONE = {
@@ -13,7 +15,7 @@ const QUOTE_TONE = {
 };
 
 function QuotesPage({ onOpenTask }) {
-  const quotes = BGG_DATA.quotes;
+  const [quotes, setQuotes] = useState([]);
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("Todos");
   const [servico, setServico] = useState("Todos");
@@ -21,12 +23,25 @@ function QuotesPage({ onOpenTask }) {
   const [confirm, ConfirmEl] = useConfirm();
   const toast = useToast();
 
+  const fetchQuotes = () =>
+    api.get('/quotes')
+      .then(({ data }) => setQuotes(data.map(mapQuoteFromApi)))
+      .catch(() => setQuotes([]));
+      
+  useEffect(() => {
+    fetchQuotes();
+  }, []);
+
   const filtered = quotes.filter(q => {
-    if (status !== "Todos" && q.status !== status) return false;
-    if (servico !== "Todos" && q.servico !== servico) return false;
+    if (status !== 'Todos' && q.status !== status) return false;
+    if (servico !== 'Todos' && !q.servico.includes(servico)) return false;
     if (search) {
       const s = search.toLowerCase();
-      if (!q.id.toLowerCase().includes(s) && !q.cliente.toLowerCase().includes(s) && !q.projeto.toLowerCase().includes(s)) return false;
+      if (
+        !q.id.toLowerCase().includes(s) &&
+        !q.cliente.toLowerCase().includes(s) &&
+        !q.projeto.toLowerCase().includes(s)
+      ) return false;
     }
     return true;
   });
@@ -34,10 +49,21 @@ function QuotesPage({ onOpenTask }) {
   const byStatus = (s) => quotes.filter(q => q.status === s);
   const sumByStatus = (s) => byStatus(s).reduce((sum, q) => sum + q.valor, 0);
 
-  const onApprove = async (id) => {
-    const ok = await confirm({ title: "Aprovar orçamento?", body: "Tem certeza de que deseja aprovar este orçamento?", ok: "Aprovar" });
+  const handleApprove = async (id) => {
+    const ok = await confirm({ 
+      title: "Aprovar orçamento?", 
+      body: "Tem certeza de que deseja aprovar este orçamento?", 
+      ok: "Aprovar" 
+    });
     if (!ok) return;
-    toast({ kind: "success", title: "Orçamento aprovado", desc: id });
+    try {
+      await api.patch(`/quotes/${id}/approve`);
+      const { data } = await api.get('/quotes');
+      setQuotes(data.map(mapQuoteFromApi));
+      toast({ kind: 'success', title: 'Orçamento aprovado', desc: id });
+    } catch {
+      toast({ kind: 'error', title: 'Erro ao aprovar', desc: 'Não foi possível aprovar o orçamento.' });
+    }
   };
   const onSend = async (id) => {
     const ok = await confirm({ title: "Enviar orçamento ao cliente?", body: "Tem certeza de que deseja enviar este orçamento ao cliente?", ok: "Enviar" });
@@ -55,7 +81,7 @@ function QuotesPage({ onOpenTask }) {
             <div className="page-sub">{quotes.length} orçamentos no funil · {fmtBRL(quotes.reduce((s, q) => s + q.valor, 0))} em valor total</div>
           </div>
           <div className="row" style={{ gap: 10 }}>
-            <Button variant="secondary" icon={Icon.Download}>Exportar</Button>
+            <Button variant="secondary" icon={Icon.RefreshCw} onClick={fetchQuotes}>Atualizar</Button>
             <Button icon={Icon.Plus}>Novo orçamento</Button>
           </div>
         </div>
@@ -152,8 +178,8 @@ function QuotesPage({ onOpenTask }) {
                   <td className="muted small mono">{q.validade}</td>
                   <td className="muted small">{q.responsavel}</td>
                   <td className="actions-cell" onClick={(e) => e.stopPropagation()}>
-                    {q.status === "Pendente" ? (
-                      <button className="row-action" title="Aprovar" onClick={() => onApprove(q.id)}><Icon.Check size={14}/></button>
+                    {(q.status === "Pendente" || q.status === "Pronto para envio") ? (
+                      <button className="row-action" title="Aprovar" onClick={() => handleApprove(q.id)}><Icon.Check size={14}/></button>
                     ) : null}
                     {q.status === "Pronto para envio" || q.status === "Aprovado" ? (
                       <button className="row-action" title="Enviar" onClick={() => onSend(q.id)}><Icon.Send size={14}/></button>
@@ -182,7 +208,7 @@ function QuotesPage({ onOpenTask }) {
           <>
             <Button variant="ghost" icon={Icon.Download}>Baixar PDF</Button>
             <Button variant="secondary" icon={Icon.Edit}>Editar</Button>
-            {detail.status === "Pendente" ? <Button icon={Icon.Check} onClick={() => { onApprove(detail.id); setDetail(null); }}>Aprovar</Button> : null}
+            {detail.status === "Pendente" ? <Button icon={Icon.Check} onClick={() => { handleApprove(detail.id); setDetail(null); }}>Aprovar</Button> : null}
             {detail.status === "Pronto para envio" || detail.status === "Aprovado" ? <Button icon={Icon.Send} onClick={() => { onSend(detail.id); setDetail(null); }}>Enviar ao cliente</Button> : null}
             {detail.status === "Enviado" ? <Button variant="secondary" icon={Icon.RefreshCw}>Reenviar</Button> : null}
           </>

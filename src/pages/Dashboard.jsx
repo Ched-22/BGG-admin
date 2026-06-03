@@ -98,9 +98,11 @@ function TodayBlock({ tasks, onOpenTask }) {
   );
 }
 
-function DashboardPage({ onNav, onOpenTask, onEditQuote, onApproveQuote, onSendQuote, onAssignTech, onSchedule, onRejectTask, inventory }) {
+function DashboardPage({ onNav, onOpenTask, onEditQuote, onApproveQuote, onSendQuote, onAssignTech, onSchedule, onRejectTask, inventory, quotes = [] }) {
   const D = BGG_DATA;
   const tasks = D.tasks;
+  const quotesPending = quotes.filter((q) => q.status === "Pendente");
+  const quotesReady = quotes.filter((q) => q.status === "Pronto para envio");
   const compraUrgente = (inventory || []).filter(needsRestock);
   const novas = tasks.filter(t => t.status === "Nova solicitação");
   const naoAgendadas = tasks.filter(t => t.status === "Não agendado");
@@ -112,7 +114,7 @@ function DashboardPage({ onNav, onOpenTask, onEditQuote, onApproveQuote, onSendQ
         <div className="titles">
           <span className="eyebrow-sm">Bom dia, Ana</span>
           <h2 className="page-title">Visão geral da operação</h2>
-          <div className="page-sub page-sub-bold">{tasks.length} tarefas ativas · {D.quotesPending.length + D.quotesReady.length} orçamentos em aberto</div>
+          <div className="page-sub page-sub-bold">{tasks.length} tarefas ativas · {quotesPending.length + quotesReady.length} orçamentos em aberto</div>
         </div>
         <div className="row" style={{ gap: 10 }}>
           <Button variant="secondary" icon={Icon.RefreshCw}>Atualizar</Button>
@@ -180,10 +182,10 @@ function DashboardPage({ onNav, onOpenTask, onEditQuote, onApproveQuote, onSendQ
           <DashboardCard
             title="Orçamentos Pendentes"
             icon="FileText"
-            count={D.quotesPending.length}
-            action={<button className="link-underline" onClick={() => onNav({ page: "tasks", filter: "pending" })} style={{ fontSize: 10 }}>Ver todos</button>}
+            count={quotesPending.length}
+            action={<button className="link-underline" onClick={() => onNav({ page: "quotes", filter: "Pendente" })} style={{ fontSize: 10 }}>Ver todos</button>}
           >
-            {D.quotesPending.slice(0, 4).map((q) => (
+            {quotesPending.slice(0, 4).map((q) => (
               <div key={q.id} className="task-list-row">
                 <span className="id mono">{q.id}</span>
                 <div style={{ minWidth: 0 }}>
@@ -210,10 +212,10 @@ function DashboardPage({ onNav, onOpenTask, onEditQuote, onApproveQuote, onSendQ
           <DashboardCard
             title="Prontos para Enviar"
             icon="Send"
-            count={D.quotesReady.length}
-            action={<button className="link-underline" onClick={() => onNav({ page: "tasks", filter: "ready" })} style={{ fontSize: 10 }}>Ver todos</button>}
+            count={quotesReady.length}
+            action={<button className="link-underline" onClick={() => onNav({ page: "quotes", filter: "Pronto para envio" })} style={{ fontSize: 10 }}>Ver todos</button>}
           >
-            {D.quotesReady.map((q) => (
+            {quotesReady.map((q) => (
               <div key={q.id} className="task-list-row">
                 <span className="id mono">{q.id}</span>
                 <div style={{ minWidth: 0 }}>

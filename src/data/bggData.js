@@ -19,21 +19,7 @@ export const BGG_DATA = (() => {
 
   const techNames = Array.from({ length: 8 }, (_, i) => `Técnico ${i + 1}`);
 
-  // ---------- Quotes ----------
-  const quotesPending = [
-    { id: "ORC-10421", projeto: "Restauração completa — Coupé", cliente: "Cliente 12", servico: "Polimento e Vitrificação", endereco: "Rua das Camélias, 482 — São Paulo, SP", valor: 4280, idade: "3 dias" },
-    { id: "ORC-10418", projeto: "Proteção cerâmica integral", cliente: "Cliente 07", servico: "Proteção Cerâmica", endereco: "Av. Oscar Freire, 1203 — São Paulo, SP", valor: 7950, idade: "5 dias" },
-    { id: "ORC-10415", projeto: "Detalhamento exterior premium", cliente: "Cliente 03", servico: "Detalhamento Exterior", endereco: "Av. Atlântica, 88 — Rio de Janeiro, RJ", valor: 2380, idade: "1 semana" },
-    { id: "ORC-10411", projeto: "Higienização interior — SUV", cliente: "Cliente 21", servico: "Detalhamento Interior", endereco: "Rua Padre João Manuel, 950 — São Paulo, SP", valor: 1680, idade: "1 semana" },
-    { id: "ORC-10408", projeto: "PPF para frontal completo", cliente: "Cliente 09", servico: "PPF — Película Protetora", endereco: "Alameda Lorena, 401 — São Paulo, SP", valor: 12400, idade: "9 dias" },
-  ];
-
-  const quotesReady = [
-    { id: "ORC-10429", projeto: "Vitrificação Carbon Pro", cliente: "Cliente 18", servico: "Proteção Cerâmica", endereco: "Rua Itaim, 220 — São Paulo, SP", valor: 6200 },
-    { id: "ORC-10427", projeto: "Tratamento de couro completo", cliente: "Cliente 14", servico: "Tratamento de Couro", endereco: "Av. Brasil, 1500 — São Paulo, SP", valor: 1980 },
-    { id: "ORC-10425", projeto: "Detalhamento motos — Ducati", cliente: "Cliente 25", servico: "Detalhamento Motos", endereco: "Rua Joaquim Floriano, 72 — São Paulo, SP", valor: 1450 },
-    { id: "ORC-10422", projeto: "Higienização premium SUV", cliente: "Cliente 06", servico: "Higienização Premium", endereco: "Rua da Consolação, 3088 — São Paulo, SP", valor: 2840 },
-  ];
+  // ---------- Quotes (carregados via API) ----------
 
   // ---------- Tasks ----------
   const today = "2026-05-21";
@@ -305,19 +291,9 @@ export const BGG_DATA = (() => {
     });
   });
 
-  // ---------- Unified quotes ----------
-  const quotes = [
-    ...quotesPending.map(q => ({ ...q, status: "Pendente", dataCriacao: "2026-05-12", validade: "2026-06-12", responsavel: "Ana Coordenadora" })),
-    ...quotesReady.map(q => ({ ...q, idade: "—", status: "Pronto para envio", dataCriacao: "2026-05-15", validade: "2026-06-15", responsavel: "Ana Coordenadora" })),
-    { id: "ORC-10402", projeto: "PPF frontal completo", cliente: "Cliente 09", servico: "PPF — Película Protetora", endereco: "Alameda Lorena, 401 — São Paulo, SP", valor: 12400, idade: "—", status: "Aprovado", dataCriacao: "2026-05-08", validade: "2026-06-08", responsavel: "Ana Coordenadora" },
-    { id: "ORC-10398", projeto: "Vitrificação Carbon Pro", cliente: "Cliente 18", servico: "Proteção Cerâmica", endereco: "Rua Itaim, 220 — São Paulo, SP", valor: 6200, idade: "—", status: "Aprovado", dataCriacao: "2026-05-14", validade: "2026-06-14", responsavel: "Bruno Atendimento" },
-    { id: "ORC-10392", projeto: "Higienização premium SUV", cliente: "Cliente 06", servico: "Higienização Premium", endereco: "Rua da Consolação, 3088 — São Paulo, SP", valor: 2840, idade: "—", status: "Rejeitado", dataCriacao: "2026-05-04", validade: "2026-06-04", responsavel: "Ana Coordenadora" },
-    { id: "ORC-10388", projeto: "Detalhamento motos — Ducati", cliente: "Cliente 25", servico: "Detalhamento Motos", endereco: "Rua Joaquim Floriano, 72 — São Paulo, SP", valor: 1450, idade: "—", status: "Aprovado", dataCriacao: "2026-05-13", validade: "2026-06-13", responsavel: "Bruno Atendimento" },
-    { id: "ORC-10381", projeto: "Tratamento de couro completo", cliente: "Cliente 14", servico: "Tratamento de Couro", endereco: "Av. Brasil, 1500 — São Paulo, SP", valor: 1980, idade: "—", status: "Enviado", dataCriacao: "2026-05-15", validade: "2026-06-15", responsavel: "Ana Coordenadora" },
-    { id: "ORC-10374", projeto: "PPF — Range Rover (cobertura total)", cliente: "Cliente 30", servico: "PPF — Película Protetora", endereco: "Rua Haddock Lobo, 800 — São Paulo, SP", valor: 24800, idade: "—", status: "Expirado", dataCriacao: "2026-04-02", validade: "2026-05-02", responsavel: "Ana Coordenadora" },
-  ];
+  // quotes — carregados via API (App / QuotesPage)
 
-  // Eventos extras do calendário (demonstração; mesclados no App via buildCalendarEvents)
+  // Eventos extras do calendário
   const seedCalendarExtras = [
     { id: "TR-2850", title: "Polimento Mercedes AMG", cliente: "Cliente 30", servico: "Polimento e Vitrificação", tecnico: "Técnico 1", data: "2026-05-22", horario: "09:00", baia: 1, duracaoHoras: 3, status: "Agendado", endereco: { unidade: "—", logradouro: "—", cidade: "São Paulo", estado: "SP", cep: "—" } },
     { id: "TR-2851", title: "Vitrificação Porsche 911", cliente: "Cliente 31", servico: "Proteção Cerâmica", tecnico: "Técnico 2", data: "2026-05-22", horario: "14:00", baia: 2, duracaoHoras: 2, status: "Agendado", endereco: { unidade: "—", logradouro: "—", cidade: "São Paulo", estado: "SP", cep: "—" } },
@@ -359,7 +335,6 @@ export const BGG_DATA = (() => {
 
   return {
     serviceTypes, estados, techNames,
-    quotesPending, quotesReady, quotes,
     tasks, techs, alerts,
     inventoryProducts,
     customers, seedCalendarExtras,

@@ -1,6 +1,7 @@
-import React, { useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { BGG_DATA } from "./data/bggData";
 import { buildCalendarEvents } from "./lib/scheduling";
+import api from "./lib/api";
 import { useToast, useConfirm } from "./components/ui";
 import { LoginScreen, RegisterScreen, ForgotScreen, ResetScreen } from "./pages/auth";
 import { Sidebar, TopBar } from "./components/layout/Chrome";
@@ -18,6 +19,7 @@ function App() {
   const [authRoute, setAuthRoute] = useState("login"); // login | register | forgot | reset
   const [route, setRoute] = useState({ page: "dashboard" });
   const [tasks, setTasks] = useState(BGG_DATA.tasks);
+  const [quotes, setQuotes] = useState([]);
   const [inventory, setInventory] = useState(() => BGG_DATA.inventoryProducts.map((p) => ({ ...p })));
   const [pendingFilter, setPendingFilter] = useState(null);
 
@@ -34,6 +36,14 @@ function App() {
   );
 
   const toast = useToast();
+
+  const loadQuotes = useCallback(() => {
+    api.get("/quotes").then(({ data }) => setQuotes(data)).catch(() => setQuotes([]));
+  }, []);
+
+  useEffect(() => {
+    if (authed) loadQuotes();
+  }, [authed, loadQuotes]);
 
   // ----- nav helpers -----
   const nav = (r) => {
@@ -110,11 +120,28 @@ function App() {
       ok: "Aprovar",
     });
     if (!ok) return;
-    updateTask(id, {
-      orcamento: { ...(tasks.find(t => t.id === id).orcamento), status: "Aprovado" },
-      status: tasks.find(t => t.id === id).status === "Aguardando orçamento" ? "Não agendado" : tasks.find(t => t.id === id).status,
+    try {
+      await api.patch(`/quotes/${id}/approve`);
+      const { data } = await api.get("/quotes");
+      setQuotes(data);
+      toast({ kind: "success", title: "Orçamento aprovado", desc: `Pronto para envio ao cliente — ${id}.` });
+    } catch {
+      toast({ kind: "error", title: "Erro ao aprovar", desc: "Não foi possível aprovar o orçamento." });
+    }
+  };
+  const onApproveTaskQuote = async (taskId) => {
+    const ok = await confirm({
+      title: "Aprovar orçamento?",
+      body: "Tem certeza de que deseja aprovar este orçamento?",
+      ok: "Aprovar",
     });
-    toast({ kind: "success", title: "Orçamento aprovado", desc: `Pronto para envio ao cliente — ${id}.` });
+    if (!ok) return;
+    const cur = tasks.find((t) => t.id === taskId);
+    updateTask(taskId, {
+      orcamento: { ...cur.orcamento, status: "Aprovado" },
+      status: cur.status === "Aguardando orçamento" ? "Não agendado" : cur.status,
+    });
+    toast({ kind: "success", title: "Orçamento aprovado", desc: `Pronto para envio ao cliente — ${taskId}.` });
   };
   const onSendQuote = async (id) => {
     const ok = await confirm({
@@ -206,6 +233,7 @@ function App() {
             onSchedule={onSchedule}
             onRejectTask={onRejectTask}
             inventory={inventory}
+            quotes={quotes}
           />
         ) : null}
 
@@ -227,7 +255,7 @@ function App() {
             task={task}
             onAssignTech={onAssignTech}
             onSchedule={onSchedule}
-            onApproveQuote={onApproveQuote}
+            onApproveQuote={onApproveTaskQuote}
             onSendQuote={onSendQuote}
             onResendQuote={onResendQuote}
             onSaveQA={onSaveQA}
