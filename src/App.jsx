@@ -3,10 +3,7 @@ import { BGG_DATA } from "./data/bggData";
 import { buildCalendarEvents } from "./lib/scheduling";
 import api from "./lib/api";
 import { useToast, useConfirm } from "./components/ui";
-<<<<<<< HEAD
 import { useAuth } from "./context/AuthContext";
-=======
->>>>>>> b090358bc2a53c1c91f0c5f7f5db697eea38ad43
 import { LoginScreen, RegisterScreen, ForgotScreen, ResetScreen } from "./pages/auth";
 import { Sidebar, TopBar } from "./components/layout/Chrome";
 import { DashboardPage } from "./pages/Dashboard";
@@ -19,11 +16,7 @@ import { QuotesPage } from "./pages/Quotes";
 import { StockPage } from "./pages/Stock";
 
 function App() {
-<<<<<<< HEAD
   const { isAuthenticated, logout, sessionExpired, clearSessionExpired } = useAuth();
-=======
-  const [authed, setAuthed] = useState(true); // start logged in by default
->>>>>>> b090358bc2a53c1c91f0c5f7f5db697eea38ad43
   const [authRoute, setAuthRoute] = useState("login"); // login | register | forgot | reset
   const [route, setRoute] = useState({ page: "dashboard" });
   const [tasks, setTasks] = useState(BGG_DATA.tasks);
@@ -50,7 +43,6 @@ function App() {
   }, []);
 
   useEffect(() => {
-<<<<<<< HEAD
     if (isAuthenticated) loadQuotes();
   }, [isAuthenticated, loadQuotes]);
 
@@ -64,10 +56,6 @@ function App() {
       clearSessionExpired();
     }
   }, [isAuthenticated, sessionExpired, clearSessionExpired, toast]);
-=======
-    if (authed) loadQuotes();
-  }, [authed, loadQuotes]);
->>>>>>> b090358bc2a53c1c91f0c5f7f5db697eea38ad43
 
   // ----- nav helpers -----
   const nav = (r) => {
@@ -218,18 +206,12 @@ function App() {
   };
 
   // ----- auth handlers -----
-<<<<<<< HEAD
   if (!isAuthenticated) {
     const goAuth = (r) => setAuthRoute(r);
     const onAuthed = () => {
       setRoute({ page: "dashboard" });
       toast({ kind: "success", title: "Bem-vindo", desc: "Sessão iniciada." });
     };
-=======
-  if (!authed) {
-    const goAuth = (r) => setAuthRoute(r);
-    const onAuthed = () => { setAuthed(true); setRoute({ page: "dashboard" }); toast({ kind: "success", title: "Bem-vindo", desc: "Sessão iniciada." }); };
->>>>>>> b090358bc2a53c1c91f0c5f7f5db697eea38ad43
     const authScreen = authRoute === "login" ? <LoginScreen onAuthed={onAuthed} onGo={goAuth}/>
       : authRoute === "register" ? <RegisterScreen onAuthed={onAuthed} onGo={goAuth}/>
       : authRoute === "forgot" ? <ForgotScreen onGo={goAuth}/>
@@ -250,14 +232,10 @@ function App() {
         onNav={nav}
         collapsed={sidebarCollapsed}
         onToggleCollapsed={() => setSidebarCollapsed((c) => !c)}
-<<<<<<< HEAD
         onLogout={() => {
           logout();
           setAuthRoute("login");
         }}
-=======
-        onLogout={() => { setAuthed(false); setAuthRoute("login"); }}
->>>>>>> b090358bc2a53c1c91f0c5f7f5db697eea38ad43
       />
       <div className="main-col">
         <TopBar route={route} onNav={nav}/>

@@ -1,6 +1,5 @@
 import React, { Fragment } from "react";
 import { Icon, Brand, Button } from "../ui";
-<<<<<<< HEAD
 import { useAuth } from "../../context/AuthContext";
 
 function userInitial(name) {
@@ -15,8 +14,6 @@ function roleLabel(role) {
   if (role === "TECHNICIAN") return "Técnico";
   return role || "Usuário";
 }
-=======
->>>>>>> b090358bc2a53c1c91f0c5f7f5db697eea38ad43
 
 const NAV_SECTIONS = [
   {
@@ -39,13 +36,10 @@ const NAV_SECTIONS = [
 ];
 
 function Sidebar({ route, onNav, collapsed, onToggleCollapsed, onLogout }) {
-<<<<<<< HEAD
   const { user } = useAuth();
   const displayName = user?.name || "Usuário";
   const initial = userInitial(displayName);
 
-=======
->>>>>>> b090358bc2a53c1c91f0c5f7f5db697eea38ad43
   return (
     <aside className="sidebar" data-collapsed={collapsed}>
       <div className="sidebar-logo">
@@ -78,21 +72,12 @@ function Sidebar({ route, onNav, collapsed, onToggleCollapsed, onLogout }) {
         ))}
       </nav>
       <div className="sidebar-foot">
-<<<<<<< HEAD
         <div className="avatar" title={displayName}>{initial}</div>
         {!collapsed ? (
           <>
             <div className="me">
               <span className="me-name">{displayName}</span>
               <span className="me-role">{roleLabel(user?.role)}</span>
-=======
-        <div className="avatar" title="Ana Coordenadora">A</div>
-        {!collapsed ? (
-          <>
-            <div className="me">
-              <span className="me-name">Ana Coordenadora</span>
-              <span className="me-role">Admin</span>
->>>>>>> b090358bc2a53c1c91f0c5f7f5db697eea38ad43
             </div>
             <button type="button" className="collapse-btn" onClick={onLogout} title="Sair">
               <Icon.LogOut size={14}/>
@@ -112,13 +97,10 @@ function Sidebar({ route, onNav, collapsed, onToggleCollapsed, onLogout }) {
 }
 
 function TopBar({ route, onNav }) {
-<<<<<<< HEAD
   const { user } = useAuth();
   const displayName = user?.name || "Usuário";
   const initial = userInitial(displayName);
 
-=======
->>>>>>> b090358bc2a53c1c91f0c5f7f5db697eea38ad43
   const titles = {
     dashboard: { eye: "Console Operacional", title: "Dashboard" },
     tasks: { eye: "Operações", title: "Tarefas Abertas" },
@@ -173,11 +155,7 @@ function TopBar({ route, onNav }) {
         <span className="dot"></span>
       </button>
       <div style={{ width: 1, alignSelf: "stretch", margin: "12px 4px", background: "var(--border)" }}/>
-<<<<<<< HEAD
       <div className="avatar" title={displayName}>{initial}</div>
-=======
-      <div className="avatar" title="Ana Coordenadora">A</div>
->>>>>>> b090358bc2a53c1c91f0c5f7f5db697eea38ad43
     </header>
   );
 }

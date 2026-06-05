@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { BGG_DATA } from "../data/bggData";
 import { Button, Icon, Field, Input, Modal, StatusBadge } from "../components/ui";
@@ -36,29 +35,10 @@ function TechniciansPage({ onOpenTask }) {
   const [techs, setTechs] = useState([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
-=======
-import React, { useState } from "react";
-import { BGG_DATA } from "../data/bggData";
-import { Button, Icon, Field, Input, Select, Modal, StatusBadge } from "../components/ui";
-
-function TechniciansPage({ onOpenTask }) {
-  // Enrich tech data
-  const baseTechs = BGG_DATA.techs;
-  const tasks = BGG_DATA.tasks;
-  const techs = baseTechs.map(t => {
-    const myTasks = tasks.filter(x => x.tecnico === t.name);
-    const ativas = myTasks.filter(x => ["Agendado","Em andamento","Sem técnico"].includes(x.status)).length;
-    const concluidas = 40 + Math.floor(Math.random() * 80); // simulated
-    const rating = (4.6 + Math.random() * 0.4).toFixed(2);
-    return { ...t, myTasks, ativas, concluidas, rating };
-  });
-
->>>>>>> b090358bc2a53c1c91f0c5f7f5db697eea38ad43
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState("Todos");
   const [view, setView] = useState("cards");
   const [detail, setDetail] = useState(null);
-<<<<<<< HEAD
   const [detailLoading, setDetailLoading] = useState(false);
   const [showNew, setShowNew] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -198,21 +178,6 @@ function TechniciansPage({ onOpenTask }) {
       minute: "2-digit",
     });
   };
-=======
-  const [showNew, setShowNew] = useState(false);
-
-  const filtered = techs.filter(t => {
-    if (filter === "Disponíveis" && !t.disponivel) return false;
-    if (filter === "Conflitos" && !t.conflito) return false;
-    if (filter === "Indisponíveis" && t.disponivel) return false;
-    if (search && !t.name.toLowerCase().includes(search.toLowerCase()) && !t.skills.join(" ").toLowerCase().includes(search.toLowerCase())) return false;
-    return true;
-  });
-
-  const totalAtivas = techs.reduce((s, t) => s + t.ativas, 0);
-  const totalConcluidas = techs.reduce((s, t) => s + t.concluidas, 0);
-  const utilizacaoMedia = Math.round(techs.reduce((s, t) => s + (t.carga / 8) * 100, 0) / techs.length);
->>>>>>> b090358bc2a53c1c91f0c5f7f5db697eea38ad43
 
   return (
     <>
@@ -221,13 +186,9 @@ function TechniciansPage({ onOpenTask }) {
           <div className="titles">
             <span className="eyebrow-sm">Gestão</span>
             <h2 className="page-title">Técnicos</h2>
-<<<<<<< HEAD
             <div className="page-sub">
               {loading ? "A carregar…" : `${total} técnicos · ${totalAtivas} tarefas ativas · ${utilizacaoMedia}% utilização média`}
             </div>
-=======
-            <div className="page-sub">{techs.length} técnicos · {totalAtivas} tarefas ativas · {utilizacaoMedia}% utilização média</div>
->>>>>>> b090358bc2a53c1c91f0c5f7f5db697eea38ad43
           </div>
           <div className="row" style={{ gap: 10 }}>
             <Button variant="secondary" icon={Icon.Calendar}>Ver escala</Button>
@@ -235,20 +196,12 @@ function TechniciansPage({ onOpenTask }) {
           </div>
         </div>
 
-<<<<<<< HEAD
-=======
-        {/* KPI */}
->>>>>>> b090358bc2a53c1c91f0c5f7f5db697eea38ad43
         <div className="dash-grid" style={{ marginBottom: 22 }}>
           <div className="col-3">
             <div className="kpi tall">
               <span className="label" style={{ fontSize: 10, letterSpacing: "0.18em", textTransform: "uppercase", color: "var(--fg-5)" }}>Total da equipe</span>
               <div className="stat">
-<<<<<<< HEAD
                 <div className="num">{total}</div>
-=======
-                <div className="num">{techs.length}</div>
->>>>>>> b090358bc2a53c1c91f0c5f7f5db697eea38ad43
                 <div className="delta">Profissionais ativos</div>
               </div>
             </div>
@@ -267,11 +220,7 @@ function TechniciansPage({ onOpenTask }) {
               <span className="label" style={{ fontSize: 10, letterSpacing: "0.18em", textTransform: "uppercase", color: "var(--fg-5)" }}>Concluídas (mês)</span>
               <div className="stat">
                 <div className="num">{totalConcluidas}</div>
-<<<<<<< HEAD
                 <div className="delta up">API · mês corrente</div>
-=======
-                <div className="delta up">+12% vs mês anterior</div>
->>>>>>> b090358bc2a53c1c91f0c5f7f5db697eea38ad43
               </div>
             </div>
           </div>
@@ -307,7 +256,6 @@ function TechniciansPage({ onOpenTask }) {
           </div>
         </div>
 
-<<<<<<< HEAD
         {loading ? (
           <div className="muted small" style={{ padding: 40, textAlign: "center" }}>A carregar técnicos…</div>
         ) : filtered.length === 0 ? (
@@ -319,15 +267,6 @@ function TechniciansPage({ onOpenTask }) {
               const utilClass = util > 85 ? "high" : util > 60 ? "med" : "";
               return (
                 <div key={t.id} className="entity-card" onClick={() => openDetail(t)}>
-=======
-        {view === "cards" ? (
-          <div className="entity-grid">
-            {filtered.map(t => {
-              const util = Math.round((t.carga / 8) * 100);
-              const utilClass = util > 85 ? "high" : util > 60 ? "med" : "";
-              return (
-                <div key={t.name} className="entity-card" onClick={() => setDetail(t)}>
->>>>>>> b090358bc2a53c1c91f0c5f7f5db697eea38ad43
                   <div className="head">
                     <div className="avatar" style={{ background: "var(--bg-elevated)", color: "var(--fg)", border: "1px solid var(--border)" }}>
                       {t.name.split(" ").pop()}
@@ -347,11 +286,7 @@ function TechniciansPage({ onOpenTask }) {
                       <span style={{ color: util > 85 ? "var(--destructive)" : util > 60 ? "#d4a017" : "var(--gold)" }}>{util}%</span>
                     </div>
                     <div className="load-bar">
-<<<<<<< HEAD
                       <div className={`fill ${utilClass}`} style={{ width: `${Math.min(100, util)}%` }}></div>
-=======
-                      <div className={`fill ${utilClass}`} style={{ width: `${util}%` }}></div>
->>>>>>> b090358bc2a53c1c91f0c5f7f5db697eea38ad43
                     </div>
                   </div>
 
@@ -369,11 +304,7 @@ function TechniciansPage({ onOpenTask }) {
                   <div>
                     <div style={{ fontSize: 10, letterSpacing: "0.14em", textTransform: "uppercase", color: "var(--fg-6)", marginBottom: 6 }}>Habilidades</div>
                     <div className="skills">
-<<<<<<< HEAD
                       {(t.skills || []).map(s => <span key={s} className="tag" style={{ fontSize: 10 }}>{s}</span>)}
-=======
-                      {t.skills.map(s => <span key={s} className="tag" style={{ fontSize: 10 }}>{s}</span>)}
->>>>>>> b090358bc2a53c1c91f0c5f7f5db697eea38ad43
                     </div>
                   </div>
 
@@ -401,17 +332,10 @@ function TechniciansPage({ onOpenTask }) {
               </thead>
               <tbody>
                 {filtered.map(t => {
-<<<<<<< HEAD
                   const util = t.util;
                   const utilClass = util > 85 ? "high" : util > 60 ? "med" : "";
                   return (
                     <tr key={t.id} onClick={() => openDetail(t)}>
-=======
-                  const util = Math.round((t.carga / 8) * 100);
-                  const utilClass = util > 85 ? "high" : util > 60 ? "med" : "";
-                  return (
-                    <tr key={t.name} onClick={() => setDetail(t)}>
->>>>>>> b090358bc2a53c1c91f0c5f7f5db697eea38ad43
                       <td>
                         <div className="row" style={{ gap: 10 }}>
                           <div className="avatar tech">{t.name.split(" ").pop()}</div>
@@ -420,22 +344,14 @@ function TechniciansPage({ onOpenTask }) {
                       </td>
                       <td style={{ maxWidth: 240 }}>
                         <div className="row" style={{ gap: 4, flexWrap: "wrap" }}>
-<<<<<<< HEAD
                           {(t.skills || []).slice(0, 3).map(s => <span key={s} className="tag" style={{ fontSize: 10 }}>{s}</span>)}
-=======
-                          {t.skills.slice(0, 3).map(s => <span key={s} className="tag" style={{ fontSize: 10 }}>{s}</span>)}
->>>>>>> b090358bc2a53c1c91f0c5f7f5db697eea38ad43
                         </div>
                       </td>
                       <td className="muted small">{t.agenda}</td>
                       <td>
                         <div style={{ display: "flex", alignItems: "center", gap: 8, justifyContent: "flex-end" }}>
                           <div className="load-bar" style={{ width: 60 }}>
-<<<<<<< HEAD
                             <div className={`fill ${utilClass}`} style={{ width: `${Math.min(100, util)}%` }}></div>
-=======
-                            <div className={`fill ${utilClass}`} style={{ width: `${util}%` }}></div>
->>>>>>> b090358bc2a53c1c91f0c5f7f5db697eea38ad43
                           </div>
                           <span className="mono" style={{ width: 36, textAlign: "right", color: util > 85 ? "var(--destructive)" : "var(--fg)" }}>{util}%</span>
                         </div>
@@ -457,19 +373,11 @@ function TechniciansPage({ onOpenTask }) {
         )}
       </div>
 
-<<<<<<< HEAD
-=======
-      {/* Detail */}
->>>>>>> b090358bc2a53c1c91f0c5f7f5db697eea38ad43
       <Modal
         open={!!detail}
         onClose={() => setDetail(null)}
         title={detail ? detail.name : ""}
-<<<<<<< HEAD
         sub={detail ? `Especialista BGG · ★ ${detail.rating} · ${(detail.skills || []).length} habilidades` : ""}
-=======
-        sub={detail ? `Especialista BGG · ★ ${detail.rating} · ${detail.skills.length} habilidades` : ""}
->>>>>>> b090358bc2a53c1c91f0c5f7f5db697eea38ad43
         size="lg"
         footer={
           <>
@@ -478,13 +386,9 @@ function TechniciansPage({ onOpenTask }) {
           </>
         }
       >
-<<<<<<< HEAD
         {detailLoading ? (
           <div className="muted small" style={{ padding: 24, textAlign: "center" }}>A carregar…</div>
         ) : detail ? (
-=======
-        {detail ? (
->>>>>>> b090358bc2a53c1c91f0c5f7f5db697eea38ad43
           <div className="col" style={{ gap: 18 }}>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 10 }}>
               <div className="kpi" style={{ padding: 12 }}>
@@ -508,16 +412,11 @@ function TechniciansPage({ onOpenTask }) {
             <div>
               <div style={{ fontSize: 11, letterSpacing: "0.12em", textTransform: "uppercase", color: "var(--gold)", fontWeight: 500, marginBottom: 8 }}>Habilidades & Especialidades</div>
               <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-<<<<<<< HEAD
                 {(detail.skills || []).map(s => <span key={s} className="tag" style={{ padding: "4px 10px" }}>{s}</span>)}
-=======
-                {detail.skills.map(s => <span key={s} className="tag" style={{ padding: "4px 10px" }}>{s}</span>)}
->>>>>>> b090358bc2a53c1c91f0c5f7f5db697eea38ad43
               </div>
             </div>
 
             <div>
-<<<<<<< HEAD
               <div style={{ fontSize: 11, letterSpacing: "0.12em", textTransform: "uppercase", color: "var(--gold)", fontWeight: 500, marginBottom: 8 }}>Agendamentos (API)</div>
               <div className="tbl-wrap">
                 <table className="tbl">
@@ -543,41 +442,11 @@ function TechniciansPage({ onOpenTask }) {
                     ) : null}
                   </tbody>
                 </table>
-=======
-              <div style={{ fontSize: 11, letterSpacing: "0.12em", textTransform: "uppercase", color: "var(--gold)", fontWeight: 500, marginBottom: 8 }}>Disponibilidade — próximos 7 dias</div>
-              <div style={{
-                display: "grid",
-                gridTemplateColumns: "repeat(7, 1fr)",
-                gap: 4,
-              }}>
-                {["Hoje","Sex","Sáb","Dom","Seg","Ter","Qua"].map((label, i) => {
-                  const busy = detail.conflito && (i === 0 || i === 4);
-                  return (
-                    <div key={i} style={{
-                      border: "1px solid var(--border)",
-                      borderRadius: 2,
-                      padding: 10,
-                      background: "var(--bg-elevated)",
-                      textAlign: "center",
-                    }}>
-                      <div style={{ fontSize: 9, color: "var(--fg-6)", letterSpacing: "0.1em", textTransform: "uppercase" }}>{label}</div>
-                      <div className="mono" style={{ fontSize: 14, color: "var(--fg)", margin: "4px 0" }}>{21 + i > 31 ? (21 + i - 31) : 21 + i}/05</div>
-                      <div className="tiny" style={{ color: busy ? "var(--destructive)" : i === 3 ? "var(--fg-6)" : "#8fbf6a" }}>
-                        {busy ? "Conflito" : i === 3 ? "Folga" : detail.agenda.split(" · ")[1] || "08-18h"}
-                      </div>
-                    </div>
-                  );
-                })}
->>>>>>> b090358bc2a53c1c91f0c5f7f5db697eea38ad43
               </div>
             </div>
 
             <div>
-<<<<<<< HEAD
               <div style={{ fontSize: 11, letterSpacing: "0.12em", textTransform: "uppercase", color: "var(--gold)", fontWeight: 500, marginBottom: 8 }}>Tarefas designadas (mock)</div>
-=======
-              <div style={{ fontSize: 11, letterSpacing: "0.12em", textTransform: "uppercase", color: "var(--gold)", fontWeight: 500, marginBottom: 8 }}>Tarefas designadas</div>
->>>>>>> b090358bc2a53c1c91f0c5f7f5db697eea38ad43
               <div className="tbl-wrap">
                 <table className="tbl">
                   <thead>
@@ -619,17 +488,12 @@ function TechniciansPage({ onOpenTask }) {
         footer={
           <>
             <Button variant="ghost" onClick={() => setShowNew(false)}>Cancelar</Button>
-<<<<<<< HEAD
             <Button icon={Icon.Plus} disabled={saving} onClick={handleCreate}>{saving ? "A guardar…" : "Cadastrar técnico"}</Button>
-=======
-            <Button icon={Icon.Plus} onClick={() => setShowNew(false)}>Cadastrar técnico</Button>
->>>>>>> b090358bc2a53c1c91f0c5f7f5db697eea38ad43
           </>
         }
       >
         <div className="col" style={{ gap: 14 }}>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-<<<<<<< HEAD
             <Field label="Nome completo">
               <Input placeholder="Ex: Pedro Detalhista" value={newForm.name} onChange={(e) => setNewForm((f) => ({ ...f, name: e.target.value }))}/>
             </Field>
@@ -647,24 +511,12 @@ function TechniciansPage({ onOpenTask }) {
             <Field label="Início">
               <Input type="date" value={newForm.startedAt} onChange={(e) => setNewForm((f) => ({ ...f, startedAt: e.target.value }))}/>
             </Field>
-=======
-            <Field label="Nome completo"><Input placeholder="Ex: Pedro Detalhista"/></Field>
-            <Field label="E-mail"><Input type="email" leading={<Icon.Mail size={14}/>}/></Field>
-          </div>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-            <Field label="Telefone"><Input leading={<Icon.Phone size={14}/>}/></Field>
-            <Field label="Início"><Input type="date"/></Field>
->>>>>>> b090358bc2a53c1c91f0c5f7f5db697eea38ad43
           </div>
           <Field label="Habilidades & Especialidades">
             <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
               {BGG_DATA.serviceTypes.map(s => (
                 <label key={s} className="checkbox">
-<<<<<<< HEAD
                   <input type="checkbox" checked={newForm.skills.includes(s)} onChange={() => toggleSkill(s)}/>
-=======
-                  <input type="checkbox"/>
->>>>>>> b090358bc2a53c1c91f0c5f7f5db697eea38ad43
                   <span className="box"></span>
                   <span style={{ fontSize: 11 }}>{s}</span>
                 </label>
@@ -672,11 +524,7 @@ function TechniciansPage({ onOpenTask }) {
             </div>
           </Field>
           <Field label="Agenda padrão" hint="Pode ser ajustado depois">
-<<<<<<< HEAD
             <Input placeholder="Seg–Sex · 08:00–18:00" value={newForm.scheduleLabel} onChange={(e) => setNewForm((f) => ({ ...f, scheduleLabel: e.target.value }))}/>
-=======
-            <Input placeholder="Seg–Sex · 08:00–18:00"/>
->>>>>>> b090358bc2a53c1c91f0c5f7f5db697eea38ad43
           </Field>
         </div>
       </Modal>
@@ -684,8 +532,4 @@ function TechniciansPage({ onOpenTask }) {
   );
 }
 
-<<<<<<< HEAD
-=======
-
->>>>>>> b090358bc2a53c1c91f0c5f7f5db697eea38ad43
 export { TechniciansPage };
