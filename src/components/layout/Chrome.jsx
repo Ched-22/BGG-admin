@@ -1,5 +1,19 @@
 import React, { Fragment } from "react";
 import { Icon, Brand, Button } from "../ui";
+import { useAuth } from "../../context/AuthContext";
+
+function userInitial(name) {
+  if (!name) return "?";
+  const parts = name.trim().split(/\s+/);
+  const letter = parts[parts.length - 1]?.[0] || name[0];
+  return letter?.toUpperCase() ?? "?";
+}
+
+function roleLabel(role) {
+  if (role === "ADMIN") return "Admin";
+  if (role === "TECHNICIAN") return "Técnico";
+  return role || "Usuário";
+}
 
 const NAV_SECTIONS = [
   {
@@ -22,6 +36,10 @@ const NAV_SECTIONS = [
 ];
 
 function Sidebar({ route, onNav, collapsed, onToggleCollapsed, onLogout }) {
+  const { user } = useAuth();
+  const displayName = user?.name || "Usuário";
+  const initial = userInitial(displayName);
+
   return (
     <aside className="sidebar" data-collapsed={collapsed}>
       <div className="sidebar-logo">
@@ -54,12 +72,12 @@ function Sidebar({ route, onNav, collapsed, onToggleCollapsed, onLogout }) {
         ))}
       </nav>
       <div className="sidebar-foot">
-        <div className="avatar" title="Ana Coordenadora">A</div>
+        <div className="avatar" title={displayName}>{initial}</div>
         {!collapsed ? (
           <>
             <div className="me">
-              <span className="me-name">Ana Coordenadora</span>
-              <span className="me-role">Admin</span>
+              <span className="me-name">{displayName}</span>
+              <span className="me-role">{roleLabel(user?.role)}</span>
             </div>
             <button type="button" className="collapse-btn" onClick={onLogout} title="Sair">
               <Icon.LogOut size={14}/>
@@ -79,6 +97,10 @@ function Sidebar({ route, onNav, collapsed, onToggleCollapsed, onLogout }) {
 }
 
 function TopBar({ route, onNav }) {
+  const { user } = useAuth();
+  const displayName = user?.name || "Usuário";
+  const initial = userInitial(displayName);
+
   const titles = {
     dashboard: { eye: "Console Operacional", title: "Dashboard" },
     tasks: { eye: "Operações", title: "Tarefas Abertas" },
@@ -133,7 +155,7 @@ function TopBar({ route, onNav }) {
         <span className="dot"></span>
       </button>
       <div style={{ width: 1, alignSelf: "stretch", margin: "12px 4px", background: "var(--border)" }}/>
-      <div className="avatar" title="Ana Coordenadora">A</div>
+      <div className="avatar" title={displayName}>{initial}</div>
     </header>
   );
 }

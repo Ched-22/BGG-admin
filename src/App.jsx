@@ -3,6 +3,7 @@ import { BGG_DATA } from "./data/bggData";
 import { buildCalendarEvents } from "./lib/scheduling";
 import api from "./lib/api";
 import { useToast, useConfirm } from "./components/ui";
+import { useAuth } from "./context/AuthContext";
 import { LoginScreen, RegisterScreen, ForgotScreen, ResetScreen } from "./pages/auth";
 import { Sidebar, TopBar } from "./components/layout/Chrome";
 import { DashboardPage } from "./pages/Dashboard";
@@ -15,7 +16,7 @@ import { QuotesPage } from "./pages/Quotes";
 import { StockPage } from "./pages/Stock";
 
 function App() {
-  const [authed, setAuthed] = useState(true); // start logged in by default
+  const { isAuthenticated, logout, sessionExpired, clearSessionExpired } = useAuth();
   const [authRoute, setAuthRoute] = useState("login"); // login | register | forgot | reset
   const [route, setRoute] = useState({ page: "dashboard" });
   const [tasks, setTasks] = useState(BGG_DATA.tasks);
@@ -42,8 +43,19 @@ function App() {
   }, []);
 
   useEffect(() => {
-    if (authed) loadQuotes();
-  }, [authed, loadQuotes]);
+    if (isAuthenticated) loadQuotes();
+  }, [isAuthenticated, loadQuotes]);
+
+  useEffect(() => {
+    if (!isAuthenticated && sessionExpired) {
+      toast({
+        kind: "error",
+        title: "Sessão expirada",
+        desc: "Faça login novamente para continuar.",
+      });
+      clearSessionExpired();
+    }
+  }, [isAuthenticated, sessionExpired, clearSessionExpired, toast]);
 
   // ----- nav helpers -----
   const nav = (r) => {
@@ -194,9 +206,12 @@ function App() {
   };
 
   // ----- auth handlers -----
-  if (!authed) {
+  if (!isAuthenticated) {
     const goAuth = (r) => setAuthRoute(r);
-    const onAuthed = () => { setAuthed(true); setRoute({ page: "dashboard" }); toast({ kind: "success", title: "Bem-vindo", desc: "Sessão iniciada." }); };
+    const onAuthed = () => {
+      setRoute({ page: "dashboard" });
+      toast({ kind: "success", title: "Bem-vindo", desc: "Sessão iniciada." });
+    };
     const authScreen = authRoute === "login" ? <LoginScreen onAuthed={onAuthed} onGo={goAuth}/>
       : authRoute === "register" ? <RegisterScreen onAuthed={onAuthed} onGo={goAuth}/>
       : authRoute === "forgot" ? <ForgotScreen onGo={goAuth}/>
@@ -217,7 +232,10 @@ function App() {
         onNav={nav}
         collapsed={sidebarCollapsed}
         onToggleCollapsed={() => setSidebarCollapsed((c) => !c)}
-        onLogout={() => { setAuthed(false); setAuthRoute("login"); }}
+        onLogout={() => {
+          logout();
+          setAuthRoute("login");
+        }}
       />
       <div className="main-col">
         <TopBar route={route} onNav={nav}/>

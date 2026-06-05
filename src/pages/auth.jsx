@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from "react";
 import { Button, Field, Input, Checkbox, Brand, Icon } from "../components/ui";
 import api from "../lib/api";
+import { useAuth } from "../context/AuthContext";
 
 function AuthArt({ caption }) {
   return (
@@ -24,6 +25,7 @@ function AuthArt({ caption }) {
 
 // ----- Login -----
 function LoginScreen({ onAuthed, onGo }) {
+  const { login } = useAuth();
   const [email, setEmail] = useState("");
   const [senha, setSenha] = useState("");
   const [showPass, setShowPass] = useState(false);
@@ -47,8 +49,11 @@ function LoginScreen({ onAuthed, onGo }) {
     setLoading(true);
     try {
       const { data } = await api.post('/auth/login', { email, password: senha });
-      localStorage.setItem('bgg-token', data.access_token);
-      localStorage.setItem('bgg-user', JSON.stringify(data.user));
+      if (data.user?.role !== 'ADMIN') {
+        setGeneric('Acesso restrito a administradores. Use admin@bgggarage.com ou outra conta ADMIN.');
+        return;
+      }
+      login(data.access_token, data.user);
       onAuthed && onAuthed(data.user);
     } catch (err) {
       setGeneric("E-mail ou senha incorretos. Tente novamente.");

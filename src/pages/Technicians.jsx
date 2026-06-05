@@ -65,7 +65,19 @@ function TechniciansPage({ onOpenTask }) {
       setTechs((res.data || []).map(mapTechForUi));
       setTotal(res.total ?? res.data?.length ?? 0);
     } catch (err) {
-      toast({ kind: "error", title: "Erro ao carregar", desc: err.response?.data?.message || "Técnicos" });
+      const msg = err.response?.data?.message;
+      const desc = Array.isArray(msg) ? msg.join(', ') : msg || 'Técnicos';
+      if (err.response?.status === 403) {
+        toast({
+          kind: "error",
+          title: "Sem permissão",
+          desc: desc.includes('administrador')
+            ? desc
+            : 'Faça login com uma conta ADMIN (ex.: admin@bgggarage.com).',
+        });
+      } else {
+        toast({ kind: "error", title: "Erro ao carregar", desc });
+      }
       setTechs([]);
     } finally {
       setLoading(false);
