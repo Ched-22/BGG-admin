@@ -1,0 +1,260 @@
+/* ============================================================
+   Black Gold Garage — Colors & Type
+   Source of truth: src/styles/theme.css in Ched-22/BGG
+   The product is a single dark-only marketing site (no light mode).
+   ============================================================ */
+
+@import url("https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&family=Montserrat:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&display=swap");
+
+:root,
+[data-theme="dark"] {
+  color-scheme: dark;
+
+  /* ---------- Color tokens (dark) ---------- */
+  --bg:           #0B0B0B;
+  --bg-elevated:  #1a1a1a;
+  --bg-overlay:   rgba(11, 11, 11, 0.80);
+
+  --fg:           #EDEDED;
+  --fg-2:         rgba(237, 237, 237, 0.90);
+  --fg-3:         rgba(237, 237, 237, 0.80);
+  --fg-4:         rgba(237, 237, 237, 0.70);
+  --fg-5:         rgba(237, 237, 237, 0.60);
+  --fg-6:         rgba(237, 237, 237, 0.40);
+
+  --gold:           #C2A46D;
+  --gold-90:        rgba(194, 164, 109, 0.90);
+  --gold-80:        rgba(194, 164, 109, 0.80);
+  --gold-30:        rgba(194, 164, 109, 0.30);
+  --gold-20:        rgba(194, 164, 109, 0.20);
+  --gold-on:        #0B0B0B;
+
+  --neutral:        #8A8A8A;
+  --destructive:    #d4183d;
+  --destructive-fg: #EDEDED;
+
+  --border:         rgba(194, 164, 109, 0.20);
+  --input-bg:       #1a1a1a;
+  --ring:           #C2A46D;
+
+  /* Admin surfaces */
+  --surface-sidebar: #0a0a0a;
+  --surface-topbar: rgba(11, 11, 11, 0.92);
+  --surface-card-1: #111111;
+  --surface-card-2: #0d0d0d;
+  --surface-muted: #0d0d0d;
+  --surface-deep: #0e0e0e;
+  --surface-deeper: #050505;
+  --surface-input-focus: #1f1f1f;
+  --surface-auth-start: #0a0a0a;
+  --surface-auth-end: #050505;
+  --overlay-modal: rgba(0, 0, 0, 0.7);
+  --overlay-cal-muted: rgba(0, 0, 0, 0.2);
+  --accent-hover: rgba(194, 164, 109, 0.06);
+  --accent-active: rgba(194, 164, 109, 0.10);
+  --accent-subtle: rgba(194, 164, 109, 0.10);
+  --shadow-sm-theme: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-theme: 0 4px 16px rgba(0, 0, 0, 0.5);
+  --shadow-lg-theme: 0 12px 32px rgba(0, 0, 0, 0.6);
+  --grid-line: rgba(194, 164, 109, 0.04);
+  --gold-glow-1: rgba(194, 164, 109, 0.18);
+  --gold-glow-2: rgba(194, 164, 109, 0.08);
+}
+
+[data-theme="light"] {
+  color-scheme: light;
+
+  --bg:           #F7F5F1;
+  --bg-elevated:  #FFFFFF;
+  --bg-overlay:   rgba(247, 245, 241, 0.88);
+
+  --fg:           #1A1A1A;
+  --fg-2:         rgba(26, 26, 26, 0.92);
+  --fg-3:         rgba(26, 26, 26, 0.82);
+  --fg-4:         rgba(26, 26, 26, 0.72);
+  --fg-5:         rgba(26, 26, 26, 0.58);
+  --fg-6:         rgba(26, 26, 26, 0.42);
+
+  --gold:           #9A7D45;
+  --gold-90:        rgba(154, 125, 69, 0.90);
+  --gold-80:        rgba(154, 125, 69, 0.80);
+  --gold-30:        rgba(154, 125, 69, 0.30);
+  --gold-20:        rgba(154, 125, 69, 0.22);
+  --gold-on:        #FFFCF7;
+
+  --neutral:        #6B6B6B;
+  --destructive:    #c41e3a;
+  --destructive-fg: #FFFFFF;
+
+  --border:         rgba(154, 125, 69, 0.28);
+  --input-bg:       #FFFFFF;
+  --ring:           #9A7D45;
+
+  --surface-sidebar: #F0EDE8;
+  --surface-topbar: rgba(247, 245, 241, 0.94);
+  --surface-card-1: #FFFFFF;
+  --surface-card-2: #F5F2EC;
+  --surface-muted: #FAF8F5;
+  --surface-deep: #EEEBE6;
+  --surface-deeper: #E8E4DD;
+  --surface-input-focus: #FFFFFF;
+  --surface-auth-start: #F5F2EC;
+  --surface-auth-end: #E8E4DD;
+  --overlay-modal: rgba(26, 26, 26, 0.45);
+  --overlay-cal-muted: rgba(0, 0, 0, 0.06);
+  --accent-hover: rgba(154, 125, 69, 0.10);
+  --accent-active: rgba(154, 125, 69, 0.16);
+  --accent-subtle: rgba(154, 125, 69, 0.12);
+  --shadow-sm-theme: 0 1px 2px rgba(26, 26, 26, 0.06);
+  --shadow-theme: 0 4px 16px rgba(26, 26, 26, 0.08);
+  --shadow-lg-theme: 0 12px 32px rgba(26, 26, 26, 0.12);
+  --grid-line: rgba(154, 125, 69, 0.08);
+  --gold-glow-1: rgba(154, 125, 69, 0.22);
+  --gold-glow-2: rgba(154, 125, 69, 0.10);
+}
+
+:root {
+
+  /* ---------- Typography ---------- */
+  --font-display: "Cormorant Garamond", Georgia, "Times New Roman", serif;
+  --font-body:    "Montserrat", ui-sans-serif, system-ui, sans-serif;
+
+  --weight-light:  300;
+  --weight-normal: 400;
+  --weight-medium: 500;
+  --weight-semi:   600;
+  --weight-bold:   700;
+
+  /* Type scale — derived from Tailwind defaults the site actually uses */
+  --text-xs:   0.75rem;   /* 12px — copyright, micro labels */
+  --text-sm:   0.875rem;  /* 14px — nav links, button labels, captions */
+  --text-base: 1rem;      /* 16px — body */
+  --text-lg:   1.125rem;  /* 18px — large body / lead paragraphs */
+  --text-xl:   1.25rem;   /* 20px — h2 (default), testimonial attribution */
+  --text-2xl:  1.5rem;    /* 24px — h1 (default), section intros */
+  --text-3xl:  1.875rem;  /* 30px — service card titles */
+  --text-4xl:  2.25rem;   /* 36px — section headings */
+  --text-5xl:  3rem;      /* 48px — large section headings on md */
+  --text-6xl:  3.75rem;   /* 60px — page hero on sm */
+  --text-7xl:  4.5rem;    /* 72px — page hero on md */
+  --text-8xl:  6rem;      /* 96px — main landing hero on lg */
+
+  /* Letter-spacing — the brand leans heavily on tracking */
+  --tracking-tight:  -0.025em;
+  --tracking-normal: 0;
+  --tracking-wide:   0.025em;
+  --tracking-wider:  0.05em;  /* default for hero, BGG wordmark, primary CTAs */
+  --tracking-widest: 0.1em;
+
+  /* Line-heights */
+  --leading-tight:  1.2;   /* headings */
+  --leading-snug:   1.375;
+  --leading-normal: 1.5;   /* body */
+  --leading-relaxed: 1.625; /* long-form */
+
+  /* ---------- Geometry ---------- */
+  --radius:    0.25rem;    /* 4px — the brand is *barely* rounded */
+  --radius-sm: 0;
+  --radius-md: 0.125rem;
+  --radius-lg: 0.25rem;
+  --radius-xl: 0.5rem;
+  --radius-full: 9999px;   /* only used on the WhatsApp FAB */
+
+  /* Shadows — theme-aware via --shadow-*-theme on :root/[data-theme] */
+  --shadow-sm: var(--shadow-sm-theme);
+  --shadow:    var(--shadow-theme);
+  --shadow-lg: var(--shadow-lg-theme);
+
+  /* Motion */
+  --ease-out:  cubic-bezier(0.22, 1, 0.36, 1); /* signature easing */
+  --dur-fast:  150ms;
+  --dur:       300ms; /* standard transition */
+  --dur-slow:  500ms;
+  --dur-img:   700ms; /* image zoom on hover */
+
+  /* Layout */
+  --container-max: 80rem;   /* max-w-7xl */
+  --nav-height:    5rem;    /* 80px */
+}
+
+/* ---------- Semantic element styles ---------- */
+html, body {
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--font-body);
+  font-weight: var(--weight-normal);
+  line-height: var(--leading-normal);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  transition: background-color var(--dur), color var(--dur);
+}
+
+h1, h2, h3 {
+  font-family: var(--font-display);
+  line-height: var(--leading-tight);
+  color: var(--gold);
+  letter-spacing: var(--tracking-wide);
+  font-weight: var(--weight-semi);
+  margin: 0;
+}
+
+h1 { font-size: var(--text-2xl); letter-spacing: var(--tracking-wider); }
+h2 { font-size: var(--text-xl); }
+h3 { font-size: var(--text-lg); font-weight: var(--weight-medium); }
+
+/* Display utility for the all-caps hero treatment used on landing/section title pages */
+.display-hero {
+  font-family: var(--font-display);
+  font-weight: var(--weight-normal);
+  letter-spacing: var(--tracking-wider);
+  line-height: var(--leading-tight);
+  color: var(--gold);
+  text-transform: uppercase;
+  font-size: clamp(3rem, 7vw, 6rem);
+}
+
+h4, h5, h6, p, label, button, input, textarea, select {
+  font-family: var(--font-body);
+  line-height: var(--leading-normal);
+}
+
+h4 { font-size: var(--text-base); font-weight: var(--weight-medium); }
+
+p { color: var(--fg-4); }
+
+/* The signature "link with growing underline" pattern. */
+.link-underline {
+  position: relative;
+  display: inline-block;
+  color: var(--gold);
+  text-transform: uppercase;
+  font-size: var(--text-sm);
+  letter-spacing: var(--tracking-wider);
+  transition: color var(--dur);
+}
+.link-underline::after {
+  content: "";
+  position: absolute;
+  left: 0; bottom: -2px;
+  width: 0; height: 1px;
+  background: var(--gold);
+  transition: width var(--dur);
+}
+.link-underline:hover::after { width: 100%; }
+
+/* Hairline gold divider — used as a section / accent rule */
+.rule-gold {
+  display: inline-block;
+  width: 3rem; height: 1px;
+  background: var(--gold);
+  transition: width var(--dur-slow);
+}
+
+/* Subtle uppercase eyebrow */
+.eyebrow {
+  font-family: var(--font-body);
+  text-transform: uppercase;
+  font-size: var(--text-sm);
+  letter-spacing: var(--tracking-wider);
+  color: var(--gold);
+}
