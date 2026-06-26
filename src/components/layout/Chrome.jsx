@@ -20,7 +20,7 @@ const NAV_SECTIONS = [
     label: "Operação",
     items: [
       { id: "dashboard", label: "Dashboard", icon: "Dashboard" },
-      { id: "tasks", label: "Tarefas Abertas", icon: "Tasks", badge: "9" },
+      { id: "tasks", label: "Tarefas Abertas", icon: "Tasks" },
       { id: "calendar", label: "Calendário", icon: "Calendar" },
     ],
   },
@@ -28,14 +28,17 @@ const NAV_SECTIONS = [
     label: "Gestão",
     items: [
       { id: "customers", label: "Clientes", icon: "Users" },
+      { id: "vehicles", label: "Veículos", icon: "MapPin" },
       { id: "technicians", label: "Técnicos", icon: "Briefcase" },
       { id: "quotes", label: "Orçamentos", icon: "FileText" },
+      { id: "services", label: "Serviços", icon: "Settings" },
       { id: "stock", label: "Estoque", icon: "Package" },
+      { id: "finance", label: "Financeiro", icon: "DollarSign", adminOnly: true },
     ],
   },
 ];
 
-function Sidebar({ route, onNav, collapsed, onToggleCollapsed, onLogout }) {
+function Sidebar({ route, onNav, onProfile, collapsed, onToggleCollapsed, onLogout, openTasksCount = 0 }) {
   const { user } = useAuth();
   const displayName = user?.name || "Usuário";
   const initial = userInitial(displayName);
@@ -49,7 +52,7 @@ function Sidebar({ route, onNav, collapsed, onToggleCollapsed, onLogout }) {
         {NAV_SECTIONS.map((sec) => (
           <Fragment key={sec.label}>
             <div className="sidebar-section">{collapsed ? "·" : sec.label}</div>
-            {sec.items.map((it) => {
+            {sec.items.filter((it) => !it.adminOnly || user?.role === "ADMIN").map((it) => {
               const IconEl = Icon[it.icon] || Icon.Dashboard;
               const active = route.page === it.id;
               return (
@@ -63,7 +66,11 @@ function Sidebar({ route, onNav, collapsed, onToggleCollapsed, onLogout }) {
                 >
                   <IconEl size={17} className="icon"/>
                   <span className="label">{it.label}</span>
-                  {it.badge ? <span className="badge-count">{it.badge}</span> : null}
+                  {it.id === "tasks" ? (
+                    <span className="badge-count">{openTasksCount}</span>
+                  ) : it.badge ? (
+                    <span className="badge-count">{it.badge}</span>
+                  ) : null}
                   {it.soon ? <span className="tiny muted label" style={{ marginLeft: "auto", fontSize: 9, letterSpacing: "0.15em", textTransform: "uppercase" }}>Soon</span> : null}
                 </button>
               );
@@ -72,17 +79,36 @@ function Sidebar({ route, onNav, collapsed, onToggleCollapsed, onLogout }) {
         ))}
       </nav>
       <div className="sidebar-foot">
-        <div className="avatar" title={displayName}>{initial}</div>
-        {!collapsed ? (
-          <>
-            <div className="me">
+        <button
+          type="button"
+          className="sidebar-profile"
+          onClick={() => onProfile?.()}
+          title="Meu perfil"
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 10,
+            flex: 1,
+            minWidth: 0,
+            background: "none",
+            border: "none",
+            padding: 0,
+            cursor: "pointer",
+            textAlign: "left",
+          }}
+        >
+          <div className="avatar">{initial}</div>
+          {!collapsed ? (
+            <div className="me" style={{ minWidth: 0 }}>
               <span className="me-name">{displayName}</span>
               <span className="me-role">{roleLabel(user?.role)}</span>
             </div>
-            <button type="button" className="collapse-btn" onClick={onLogout} title="Sair">
-              <Icon.LogOut size={14}/>
-            </button>
-          </>
+          ) : null}
+        </button>
+        {!collapsed ? (
+          <button type="button" className="collapse-btn" onClick={onLogout} title="Sair">
+            <Icon.LogOut size={14}/>
+          </button>
         ) : (
           <button type="button" className="collapse-btn" onClick={onLogout} title="Sair">
             <Icon.LogOut size={14}/>
@@ -96,7 +122,7 @@ function Sidebar({ route, onNav, collapsed, onToggleCollapsed, onLogout }) {
   );
 }
 
-function TopBar({ route, onNav }) {
+function TopBar({ route, onNav, readOnly = false, unreadCount = 0, onOpenNotifications }) {
   const { user } = useAuth();
   const displayName = user?.name || "Usuário";
   const initial = userInitial(displayName);
@@ -109,7 +135,10 @@ function TopBar({ route, onNav }) {
     customers: { eye: "Gestão", title: "Clientes" },
     technicians: { eye: "Gestão", title: "Técnicos" },
     quotes: { eye: "Gestão", title: "Orçamentos" },
+    services: { eye: "Gestão · Catálogo", title: "Serviços" },
     stock: { eye: "Gestão · Almoxarifado", title: "Estoque" },
+    finance: { eye: "Gestão · Financeiro", title: "Financeiro" },
+    profile: { eye: "Conta", title: "Meu perfil" },
   };
   const t = titles[route.page] || { eye: "BGG Admin", title: "" };
 
@@ -121,7 +150,7 @@ function TopBar({ route, onNav }) {
 
   return (
     <header className="topbar">
-      <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+      <div className="topbar-titles">
         {breadcrumbs.length ? (
           <div className="crumbs" style={{ display: "flex", gap: 6, alignItems: "center" }}>
             {breadcrumbs.map((b, i) => (
@@ -136,7 +165,12 @@ function TopBar({ route, onNav }) {
         ) : (
           <div className="crumbs">{t.eye}</div>
         )}
-        <h1>{t.title}</h1>
+        <div className="topbar-title-row">
+          <h1>{t.title}</h1>
+          {readOnly ? (
+            <span className="view-mode-badge">Visualização</span>
+          ) : null}
+        </div>
       </div>
       <div className="spacer"/>
       {route.page === "task-detail" ? (
@@ -150,9 +184,14 @@ function TopBar({ route, onNav }) {
           <span style={{ color: "var(--fg-6)", fontSize: 10, letterSpacing: "0.08em", border: "1px solid var(--border)", padding: "2px 4px", borderRadius: 2 }}>⌘ K</span>
         </div>
       )}
-      <button className="icon-btn" title="Notificações">
+      <button
+        className="icon-btn"
+        title="Notificações"
+        onClick={onOpenNotifications}
+        type="button"
+      >
         <Icon.Bell size={18}/>
-        <span className="dot"></span>
+        {unreadCount > 0 ? <span className="dot"></span> : null}
       </button>
       <div style={{ width: 1, alignSelf: "stretch", margin: "12px 4px", background: "var(--border)" }}/>
       <div className="avatar" title={displayName}>{initial}</div>

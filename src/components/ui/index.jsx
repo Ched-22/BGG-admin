@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback, useContext, createContext, createElement } from "react";
+import { formatEUR } from "../../lib/currency.js";
 
 // ---------- Icons ----------
 const I = (path, opts = {}) => (props) => {
@@ -63,6 +64,14 @@ const Icon = {
   Sparkles: I(<g><path d="M12 3l1.5 4.5L18 9l-4.5 1.5L12 15l-1.5-4.5L6 9l4.5-1.5z"/><path d="M19 14l.8 2.2L22 17l-2.2.8L19 20l-.8-2.2L16 17l2.2-.8z"/></g>),
   Sun: I(<g><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></g>),
   Moon: I(<path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>),
+  WhatsApp: (props) => {
+    const { size = 16, style, ...rest } = props || {};
+    return (
+      <svg width={size} height={size} viewBox="0 0 24 24" fill="#25D366" {...rest} style={style}>
+        <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.435 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
+      </svg>
+    );
+  },
 };
 
 // ---------- Button ----------
@@ -138,7 +147,7 @@ function StatusBadge({ children, tone }) {
 }
 
 // ---------- Modal ----------
-function Modal({ open, onClose, title, sub, children, footer, size, dismissable = true }) {
+function Modal({ open, onClose, title, sub, children, footer, size, dismissable = true, layer = "default" }) {
   useEffect(() => {
     if (!open) return;
     const h = (e) => { if (e.key === "Escape" && dismissable) onClose && onClose(); };
@@ -147,7 +156,7 @@ function Modal({ open, onClose, title, sub, children, footer, size, dismissable 
   }, [open, dismissable, onClose]);
   if (!open) return null;
   return (
-    <div className="modal-overlay" onClick={() => dismissable && onClose && onClose()}>
+    <div className="modal-overlay" data-layer={layer} onClick={() => dismissable && onClose && onClose()}>
       <div className={`modal ${size || ""}`} onClick={(e) => e.stopPropagation()}>
         {title ? (
           <div className="modal-head">
@@ -208,6 +217,7 @@ function useConfirm() {
   const [state, setState] = useState(null);
   const ConfirmEl = (
     <Modal
+      layer="confirm"
       open={!!state}
       onClose={() => state && state.resolve(false) || setState(null)}
       title={state ? state.title : ""}
@@ -226,19 +236,40 @@ function useConfirm() {
 }
 
 // ---------- Utilities ----------
-const fmtBRL = (n) => "R$ " + (n || 0).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-// ---------- Logo wordmark ----------
-function Brand({ size = 22, stacked = true, compact = false }) {
+function PageRefreshButton({ onClick, loading = false, disabled }) {
+  const [busy, setBusy] = useState(false);
+
+  const handleClick = async () => {
+    if (loading || disabled || busy) return;
+    setBusy(true);
+    try {
+      if (onClick) await onClick();
+    } catch {
+      // reload anyway
+    }
+    window.location.reload();
+  };
+
   return (
-    <div className="brand">
-      <span className="mark" style={{ fontSize: size }}>BGG</span>
-      {stacked && !compact ? (
-        <div className="stack">
-          <span className="brand-name">Black Gold Garage</span>
-          <span className="brand-sub">Admin Console</span>
-        </div>
-      ) : null}
+    <Button
+      variant="secondary"
+      icon={Icon.RefreshCw}
+      onClick={handleClick}
+      disabled={loading || disabled || busy}
+    >
+      {loading || busy ? "A atualizar…" : "Atualizar"}
+    </Button>
+  );
+}
+
+// ---------- Logo ----------
+const LOGO_SVG_URL = `${import.meta.env.BASE_URL}bgg-logo.svg`;
+
+function Brand({ compact = false }) {
+  return (
+    <div className={`brand brand--image${compact ? " brand--compact" : ""}`}>
+      <img src={LOGO_SVG_URL} alt="Black Gold Garage" className="brand-logo" />
     </div>
   );
 }
@@ -246,6 +277,6 @@ function Brand({ size = 22, stacked = true, compact = false }) {
 // ---------- Export to global ----------
 
 export {
-  Icon, Button, Field, Input, Textarea, Select, Checkbox, StatusBadge,
-  Modal, ToastProvider, useToast, useConfirm, fmtBRL, Brand, STATUS_TONE,
+  Icon, Button, PageRefreshButton, Field, Input, Textarea, Select, Checkbox, StatusBadge,
+  Modal, ToastProvider, useToast, useConfirm, formatEUR, Brand, STATUS_TONE,
 };

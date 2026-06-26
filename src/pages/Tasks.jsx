@@ -1,8 +1,21 @@
 import React, { useState, useEffect } from "react";
 import { BGG_DATA } from "../data/bggData";
+import { useAuth } from "../context/AuthContext";
+import { canViewTaskActivityLog } from "../lib/permissions";
+import { InspectionReportPanel } from "../components/InspectionReportPanel";
+import { getInspectionByTask } from "../lib/vehicleInspectionApi";
 import {
-  Button, Icon, Field, Input, Select, Textarea, StatusBadge, Modal, fmtBRL, useToast,
+  Button, Icon, PageRefreshButton, Field, Input, Select, Textarea, StatusBadge, Modal, formatEUR, useToast, useConfirm,
 } from "../components/ui";
+import { ExportMenu } from "../components/ExportMenu";
+import { TASKS_EXPORT_COLUMNS } from "../lib/exportColumns";
+import {
+  buildWhatsAppMessage,
+  normalizeWhatsAppPhone,
+  notifyWhatsAppResult,
+  openWhatsAppClient,
+} from "../lib/whatsapp";
+import { resolveClientPreferredLanguage } from "../lib/clientLanguage";
 
 const TASK_STATUSES = [
   "Todos", "Nova solicitação", "Aguardando orçamento", "Não agendado",
@@ -10,7 +23,7 @@ const TASK_STATUSES = [
 ];
 
 // ----- Open Tasks page -----
-function TasksPage({ tasks, onOpenTask, onSchedule, onAssignTech, onCreateTask, onCancelTask, externalFilter, onConsumeFilter }) {
+function TasksPage({ readOnly = false, tasks = [], onOpenTask, onSchedule, onAssignTech, onCreateTask, onCancelTask, onRefresh, externalFilter, onConsumeFilter }) {
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("Todos");
   const [servico, setServico] = useState("Todos");
@@ -35,9 +48,10 @@ function TasksPage({ tasks, onOpenTask, onSchedule, onAssignTech, onCreateTask, 
     if (dataFiltro && t.dataAgendada !== dataFiltro) return false;
     if (search) {
       const s = search.toLowerCase();
-      if (!t.id.toLowerCase().includes(s)
-        && !t.cliente.toLowerCase().includes(s)
-        && !t.projeto.toLowerCase().includes(s)) return false;
+      const id = (t.id || '').toLowerCase();
+      const cliente = (t.cliente || '').toLowerCase();
+      const projeto = (t.projeto || '').toLowerCase();
+      if (!id.includes(s) && !cliente.includes(s) && !projeto.includes(s)) return false;
     }
     return true;
   });
@@ -51,8 +65,16 @@ function TasksPage({ tasks, onOpenTask, onSchedule, onAssignTech, onCreateTask, 
           <div className="page-sub">{filtered.length} de {tasks.length} tarefas · gestão completa do funil operacional</div>
         </div>
         <div className="row" style={{ gap: 10 }}>
-          <Button variant="secondary" icon={Icon.RefreshCw}>Atualizar</Button>
-          <Button icon={Icon.Plus} onClick={onCreateTask}>Criar Tarefa</Button>
+          <PageRefreshButton onClick={onRefresh}/>
+          <ExportMenu
+            filenameBase="tarefas"
+            sheetName="Tarefas"
+            columns={TASKS_EXPORT_COLUMNS}
+            rows={filtered}
+          />
+          {!readOnly ? (
+            <Button icon={Icon.Plus} onClick={onCreateTask}>Criar Tarefa</Button>
+          ) : null}
         </div>
       </div>
 
@@ -150,31 +172,35 @@ function TasksPage({ tasks, onOpenTask, onSchedule, onAssignTech, onCreateTask, 
                 <td className="muted small mono">{t.dataCriacao.split(" ")[0]}</td>
                 <td className="actions-cell" onClick={(e) => e.stopPropagation()}>
                   <div className="actions-toolbar">
-                    <div className="action-slot">
-                      {!t.dataAgendada && t.status !== "Cancelado" ? (
-                        <button type="button" className="row-action" title="Agendar" onClick={() => onSchedule(t.id)}>
-                          <Icon.Calendar size={14}/>
-                        </button>
-                      ) : null}
-                    </div>
-                    <div className="action-slot">
-                      {!t.tecnico && t.status !== "Cancelado" ? (
-                        <button type="button" className="row-action" title="Designar técnico" onClick={() => onAssignTech(t.id)}>
-                          <Icon.UserPlus size={14}/>
-                        </button>
-                      ) : null}
-                    </div>
+                    {!readOnly ? (
+                      <>
+                        <div className="action-slot">
+                          {!t.dataAgendada && t.status !== "Cancelado" ? (
+                            <button type="button" className="row-action" title="Agendar" onClick={() => onSchedule(t.id)}>
+                              <Icon.Calendar size={14}/>
+                            </button>
+                          ) : null}
+                        </div>
+                        <div className="action-slot">
+                          {!t.tecnico && t.status !== "Cancelado" ? (
+                            <button type="button" className="row-action" title="Designar técnico" onClick={() => onAssignTech(t.id)}>
+                              <Icon.UserPlus size={14}/>
+                            </button>
+                          ) : null}
+                        </div>
+                        <div className="action-slot">
+                          {t.status !== "Cancelado" && t.status !== "Concluído" ? (
+                            <button type="button" className="row-action danger" title="Cancelar" onClick={() => onCancelTask(t.id)}>
+                              <Icon.XCircle size={14}/>
+                            </button>
+                          ) : null}
+                        </div>
+                      </>
+                    ) : null}
                     <div className="action-slot">
                       <button type="button" className="row-action" title="Abrir" onClick={() => onOpenTask(t.id)}>
                         <Icon.ArrowRight size={14}/>
                       </button>
-                    </div>
-                    <div className="action-slot">
-                      {t.status !== "Cancelado" && t.status !== "Concluído" ? (
-                        <button type="button" className="row-action danger" title="Cancelar" onClick={() => onCancelTask(t.id)}>
-                          <Icon.XCircle size={14}/>
-                        </button>
-                      ) : null}
                     </div>
                   </div>
                 </td>
@@ -195,10 +221,94 @@ function TasksPage({ tasks, onOpenTask, onSchedule, onAssignTech, onCreateTask, 
 }
 
 // ----- Task Detail -----
-function TaskDetail({ task, onAssignTech, onSchedule, onApproveQuote, onSendQuote, onResendQuote, onSaveQA, onEditQuote }) {
-  const [qaNotes, setQaNotes] = useState(task.qa.notas || "");
-  const [showSaveConfirm, setShowSaveConfirm] = useState(false);
+function TaskDetail({
+  readOnly = false,
+  task,
+  onAssignTech,
+  onSchedule,
+  onApproveQuote,
+  onSendQuote,
+  onResendQuote,
+  onSaveQaNotes,
+  onNotifyClientPickup,
+  onEditQuote,
+  onRefresh,
+}) {
   const toast = useToast();
+  const [confirm, ConfirmEl] = useConfirm();
+
+  const taskPhone = () => ({
+    countryCode: task.clienteTelCountryCode,
+    nationalNumber: task.clienteTelNationalNumber,
+  });
+
+  const openTaskWhatsApp = () => {
+    const preferredLanguage = resolveClientPreferredLanguage({ task });
+    const message = buildWhatsAppMessage("task_followup", {
+      clientName: task.cliente,
+      taskId: task.id,
+      project: task.projeto,
+    }, preferredLanguage);
+    const result = openWhatsAppClient({ phone: taskPhone(), message });
+    notifyWhatsAppResult(result, toast);
+  };
+  const [qaNotes, setQaNotes] = useState(task.qa.notas || "");
+  const [inspectionDetail, setInspectionDetail] = useState(null);
+  const [inspectionLoading, setInspectionLoading] = useState(false);
+  const [showSaveConfirm, setShowSaveConfirm] = useState(false);
+  const { user } = useAuth();
+  const showActivityLog = canViewTaskActivityLog(user);
+  const showQaSection = task.status === "Pronto para QA" || task.status === "Concluído";
+
+  useEffect(() => {
+    setQaNotes(task.qa.notas || "");
+  }, [task.id, task.qa.notas]);
+
+  useEffect(() => {
+    if (!showQaSection) {
+      setInspectionDetail(null);
+      return;
+    }
+    setInspectionLoading(true);
+    getInspectionByTask(task.id)
+      .then(setInspectionDetail)
+      .catch(() => setInspectionDetail(null))
+      .finally(() => setInspectionLoading(false));
+  }, [task.id, showQaSection]);
+  const canNotifyPickup = task.status === "Pronto para QA";
+  const clientNotified = task.qa.status === "Enviado ao cliente";
+  const [downloadingReportPdf, setDownloadingReportPdf] = useState(false);
+  const canDownloadReportPdf = Boolean(
+    inspectionDetail
+    && !inspectionLoading
+    && (inspectionDetail.submittedForReviewAt || inspectionDetail.reportStatus !== "DRAFT"),
+  );
+
+  const handleDownloadReportPdf = async () => {
+    if (!inspectionDetail) return;
+    setDownloadingReportPdf(true);
+    try {
+      const { exportInspectionReportPdf } = await import("../lib/inspectionReportPdf");
+      const filename = await exportInspectionReportPdf(inspectionDetail, task, {
+        preferredLanguage: resolveClientPreferredLanguage({ task }),
+      });
+      toast({ kind: "success", title: "PDF gerado", desc: filename });
+    } catch {
+      toast({ kind: "error", title: "Erro ao gerar PDF", desc: "Não foi possível gerar o relatório em PDF." });
+    } finally {
+      setDownloadingReportPdf(false);
+    }
+  };
+
+  const handleNotifyPickup = async () => {
+    const ok = await confirm({
+      title: "Enviar ao cliente?",
+      body: "O cliente receberá uma mensagem informando que o serviço foi finalizado e que o veículo está disponível para retirada.",
+      ok: "Enviar por WhatsApp",
+    });
+    if (!ok) return;
+    await onNotifyClientPickup(task.id, qaNotes);
+  };
 
   return (
     <div className="page">
@@ -216,10 +326,11 @@ function TaskDetail({ task, onAssignTech, onSchedule, onApproveQuote, onSendQuot
           </div>
         </div>
         <div className="row" style={{ gap: 8 }}>
-          {!task.tecnico && task.status !== "Cancelado" ? (
+          <PageRefreshButton onClick={onRefresh}/>
+          {!readOnly && !task.tecnico && task.status !== "Cancelado" ? (
             <Button variant="secondary" icon={Icon.UserPlus} onClick={() => onAssignTech(task.id)}>Designar técnico</Button>
           ) : null}
-          {!task.dataAgendada && task.status !== "Cancelado" ? (
+          {!readOnly && !task.dataAgendada && task.status !== "Cancelado" ? (
             <Button icon={Icon.Calendar} onClick={() => onSchedule(task.id)}>Agendar tarefa</Button>
           ) : null}
         </div>
@@ -241,9 +352,19 @@ function TaskDetail({ task, onAssignTech, onSchedule, onApproveQuote, onSendQuot
               <div className="kv-row">
                 <span className="k">Contato</span>
                 <span className="v">
-                  <span className="row" style={{ gap: 16 }}>
+                  <span className="row" style={{ gap: 16, alignItems: "center" }}>
                     <span className="row" style={{ gap: 6 }}><Icon.Phone size={12} style={{ color: "var(--gold)" }}/> {task.clienteTel}</span>
                     <span className="row" style={{ gap: 6 }}><Icon.Mail size={12} style={{ color: "var(--gold)" }}/> {task.clienteEmail}</span>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      icon={Icon.WhatsApp}
+                      onClick={openTaskWhatsApp}
+                      disabled={!normalizeWhatsAppPhone(taskPhone())}
+                      title="Abrir WhatsApp"
+                    >
+                      WhatsApp
+                    </Button>
                   </span>
                 </span>
               </div>
@@ -293,48 +414,82 @@ function TaskDetail({ task, onAssignTech, onSchedule, onApproveQuote, onSendQuot
             </div>
           </div>
 
-          {/* QA */}
-          {(task.status === "Pronto para QA" || task.status === "Concluído") ? (
+          {/* Revisão do relatório / QA */}
+          {showQaSection ? (
             <div className="card" style={{ borderColor: "var(--gold-30)" }}>
               <div className="card-head">
-                <h3><Icon.CheckCircle size={18}/> QA · Revisão da Conclusão</h3>
+                <h3>
+                  <Icon.CheckCircle size={18}/>
+                  {inspectionDetail || inspectionLoading ? "Revisão do relatório" : "QA · Revisão da Conclusão"}
+                </h3>
                 <StatusBadge tone="info">{task.qa.status}</StatusBadge>
               </div>
               <div className="card-body">
                 <div className="kv-row">
                   <span className="k">Concluída em</span>
-                  <span className="v mono">{task.qa.concluidoEm}</span>
+                  <span className="v mono">{task.qa.concluidoEm || "—"}</span>
                 </div>
                 <div className="kv-row">
                   <span className="k">Anotações do Técnico</span>
                   <span className="v">{task.tecnicoNotas || <span className="muted">Sem anotações.</span>}</span>
                 </div>
-                <div className="kv-row">
-                  <span className="k">Fotos de Conclusão</span>
-                  <span className="v">
-                    <div className="row" style={{ flexWrap: "wrap", gap: 8 }}>
-                      {task.qa.fotos.map((f, i) => (
-                        <div key={i} style={{
-                          width: 80, height: 60, background: "linear-gradient(135deg, #1a1a1a, #0a0a0a)",
-                          border: "1px solid var(--border)", borderRadius: 4,
-                          display: "flex", alignItems: "center", justifyContent: "center",
-                          color: "var(--gold)", position: "relative"
-                        }}>
-                          <Icon.Image size={20}/>
-                          <span className="tiny" style={{ position: "absolute", bottom: 2, left: 4, right: 4, color: "var(--fg-6)", fontSize: 9, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{f}</span>
+
+                {inspectionDetail || inspectionLoading ? (
+                  <InspectionReportPanel detail={inspectionDetail} loading={inspectionLoading} />
+                ) : (
+                  <div className="kv-row">
+                    <span className="k">Fotos de Conclusão</span>
+                    <span className="v">
+                      {task.qa.fotos.length === 0 ? (
+                        <span className="muted">Nenhuma foto registrada.</span>
+                      ) : (
+                        <div className="row" style={{ flexWrap: "wrap", gap: 8 }}>
+                          {task.qa.fotos.map((f, i) => {
+                            const isUrl = /^https?:\/\//i.test(f);
+                            if (isUrl) {
+                              return (
+                                <a key={i} href={f} target="_blank" rel="noreferrer" title="Abrir foto">
+                                  <img
+                                    src={f}
+                                    alt=""
+                                    style={{
+                                      width: 80,
+                                      height: 60,
+                                      objectFit: "cover",
+                                      border: "1px solid var(--border)",
+                                      borderRadius: 4,
+                                      display: "block",
+                                    }}
+                                  />
+                                </a>
+                              );
+                            }
+                            return (
+                              <div key={i} style={{
+                                width: 80, height: 60, background: "linear-gradient(135deg, #1a1a1a, #0a0a0a)",
+                                border: "1px solid var(--border)", borderRadius: 4,
+                                display: "flex", alignItems: "center", justifyContent: "center",
+                                color: "var(--gold)", position: "relative",
+                              }}>
+                                <Icon.Image size={20}/>
+                                <span className="tiny" style={{ position: "absolute", bottom: 2, left: 4, right: 4, color: "var(--fg-6)", fontSize: 9, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{f}</span>
+                              </div>
+                            );
+                          })}
                         </div>
-                      ))}
-                    </div>
-                  </span>
-                </div>
-                <div className="kv-row">
+                      )}
+                    </span>
+                  </div>
+                )}
+
+                <div className="kv-row" style={{ marginTop: inspectionDetail || inspectionLoading ? 12 : 0 }}>
                   <span className="k" style={{ alignSelf: "flex-start", paddingTop: 6 }}>Anotações de QA</span>
                   <span className="v">
                     <Textarea
                       value={qaNotes}
                       onChange={(e) => setQaNotes(e.target.value)}
                       placeholder="Notas internas da revisão de qualidade…"
-                      disabled={task.status === "Concluído"}
+                      disabled={readOnly || task.status === "Concluído"}
                     />
                     {task.status === "Concluído" ? (
                       <div className="hint" style={{ marginTop: 6, color: "var(--fg-6)" }}>
@@ -344,40 +499,65 @@ function TaskDetail({ task, onAssignTech, onSchedule, onApproveQuote, onSendQuot
                   </span>
                 </div>
               </div>
-              <div className="card-foot">
-                <Button variant="ghost" icon={Icon.RefreshCw}>Solicitar revisão</Button>
-                <Button
-                  disabled={task.status === "Concluído"}
-                  onClick={() => {
-                    onSaveQA(task.id, qaNotes);
-                    toast({ kind: "success", title: "Anotações de QA salvas", desc: "Tarefa aprovada e movida para Concluído." });
-                  }}
-                  icon={Icon.Check}
-                >
-                  Aprovar conclusão
-                </Button>
-              </div>
+              {!readOnly && (canNotifyPickup || canDownloadReportPdf) ? (
+                <div className="card-foot">
+                  {canDownloadReportPdf ? (
+                    <Button
+                      variant="secondary"
+                      icon={Icon.Download}
+                      onClick={handleDownloadReportPdf}
+                      disabled={downloadingReportPdf}
+                    >
+                      {downloadingReportPdf ? "Gerando…" : "Baixar PDF do relatório"}
+                    </Button>
+                  ) : null}
+                  {canNotifyPickup ? (
+                    <>
+                      <Button variant="ghost" onClick={() => onSaveQaNotes(task.id, qaNotes)}>
+                        Salvar anotações
+                      </Button>
+                      <Button
+                        variant="primary"
+                        icon={Icon.WhatsApp}
+                        onClick={handleNotifyPickup}
+                        disabled={!normalizeWhatsAppPhone(taskPhone())}
+                      >
+                        Enviar ao cliente
+                      </Button>
+                    </>
+                  ) : null}
+                </div>
+              ) : null}
+              {clientNotified && task.status === "Concluído" ? (
+                <div className="card-foot">
+                  <span className="muted small">Cliente notificado — veículo disponível para retirada.</span>
+                </div>
+              ) : null}
             </div>
           ) : null}
 
-          {/* Activity log */}
+          {showActivityLog ? (
           <div className="card">
             <div className="card-head"><h3><Icon.Clock size={18}/> Registro de Atividade</h3></div>
             <div className="card-body">
               <div className="timeline">
-                {task.log.map((l, i) => (
-                  <div key={i} className="row">
+                {(task.activityLog?.length ? task.activityLog : []).map((l) => (
+                  <div key={l.id} className="row">
                     <span></span>
                     <div>
-                      <div className="t">{l.t}</div>
-                      <span className="who">{l.w}</span>
+                      <div className="t">{l.label}</div>
+                      <span className="who">{l.actorDisplay || l.actorName}</span>
                     </div>
-                    <span className="when mono">{l.when}</span>
+                    <span className="when mono">{l.displayWhen}</span>
                   </div>
                 ))}
+                {!task.activityLog?.length ? (
+                  <p className="muted small" style={{ margin: 0 }}>Nenhuma atividade registrada.</p>
+                ) : null}
               </div>
             </div>
           </div>
+          ) : null}
         </div>
 
         {/* Right column */}
@@ -386,13 +566,25 @@ function TaskDetail({ task, onAssignTech, onSchedule, onApproveQuote, onSendQuot
           <div className="card">
             <div className="card-head"><h3><Icon.Calendar size={18}/> Agenda &amp; Técnico</h3></div>
             <div className="card-body">
+              {(task.clientDropoffDate || task.clientDropoffTime) ? (
+                <div className="kv-row" style={{ gridTemplateColumns: "1fr 1fr", marginBottom: 12 }}>
+                  <div>
+                    <div className="k" style={{ fontSize: 10, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--fg-5)", marginBottom: 4 }}>Entrega (cliente)</div>
+                    <div className="mono" style={{ color: "var(--fg)", fontSize: 15, fontWeight: 500 }}>{task.clientDropoffDate || "—"}</div>
+                  </div>
+                  <div>
+                    <div className="k" style={{ fontSize: 10, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--fg-5)", marginBottom: 4 }}>Hora entrega</div>
+                    <div className="mono" style={{ color: "var(--fg)", fontSize: 15, fontWeight: 500 }}>{task.clientDropoffTime || "—"}</div>
+                  </div>
+                </div>
+              ) : null}
               <div className="kv-row" style={{ gridTemplateColumns: "1fr 1fr" }}>
                 <div>
-                  <div className="k" style={{ fontSize: 10, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--fg-5)", marginBottom: 4 }}>Data</div>
+                  <div className="k" style={{ fontSize: 10, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--fg-5)", marginBottom: 4 }}>Serviço (técnico)</div>
                   <div className="mono" style={{ color: "var(--gold)", fontSize: 15, fontWeight: 500 }}>{task.dataAgendada || "—"}</div>
                 </div>
                 <div>
-                  <div className="k" style={{ fontSize: 10, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--fg-5)", marginBottom: 4 }}>Horário</div>
+                  <div className="k" style={{ fontSize: 10, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--fg-5)", marginBottom: 4 }}>Horário serviço</div>
                   <div className="mono" style={{ color: "var(--gold)", fontSize: 15, fontWeight: 500 }}>{task.horario || "—"}</div>
                 </div>
               </div>
@@ -433,17 +625,19 @@ function TaskDetail({ task, onAssignTech, onSchedule, onApproveQuote, onSendQuot
                 <span className="v" style={{ fontSize: 12.5 }}>{task.tecnicoNotas || <span className="muted">—</span>}</span>
               </div>
             </div>
-            <div className="card-foot">
-              {!task.tecnico && task.status !== "Cancelado" ? (
-                <Button variant="secondary" size="sm" icon={Icon.UserPlus} onClick={() => onAssignTech(task.id)}>Designar técnico</Button>
-              ) : null}
-              {!task.dataAgendada && task.status !== "Cancelado" ? (
-                <Button size="sm" icon={Icon.Calendar} onClick={() => onSchedule(task.id)}>Agendar tarefa</Button>
-              ) : null}
-              {task.tecnico && task.dataAgendada ? (
-                <Button variant="ghost" size="sm" onClick={() => onSchedule(task.id)}>Reagendar</Button>
-              ) : null}
-            </div>
+            {!readOnly ? (
+              <div className="card-foot">
+                {!task.tecnico && task.status !== "Cancelado" ? (
+                  <Button variant="secondary" size="sm" icon={Icon.UserPlus} onClick={() => onAssignTech(task.id)}>Designar técnico</Button>
+                ) : null}
+                {!task.dataAgendada && task.status !== "Cancelado" ? (
+                  <Button size="sm" icon={Icon.Calendar} onClick={() => onSchedule(task.id)}>Agendar tarefa</Button>
+                ) : null}
+                {task.tecnico && task.dataAgendada ? (
+                  <Button variant="ghost" size="sm" onClick={() => onSchedule(task.id)}>Reagendar</Button>
+                ) : null}
+              </div>
+            ) : null}
           </div>
 
           {/* Quote + Payment */}
@@ -453,7 +647,7 @@ function TaskDetail({ task, onAssignTech, onSchedule, onApproveQuote, onSendQuot
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 }}>
                 <div>
                   <div className="k" style={{ fontSize: 10, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--fg-5)", marginBottom: 4 }}>Valor do Orçamento</div>
-                  <div className="serif" style={{ color: "var(--gold)", fontSize: 26, fontWeight: 500 }}>{fmtBRL(task.orcamento.valor)}</div>
+                  <div className="serif" style={{ color: "var(--gold)", fontSize: 26, fontWeight: 500 }}>{formatEUR(task.orcamento.valor)}</div>
                 </div>
                 <div>
                   <div className="k" style={{ fontSize: 10, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--fg-5)", marginBottom: 4 }}>Status</div>
@@ -470,26 +664,29 @@ function TaskDetail({ task, onAssignTech, onSchedule, onApproveQuote, onSendQuot
               </div>
               <div className="kv-row">
                 <span className="k">Depósito</span>
-                <span className="v mono">{fmtBRL(task.orcamento.deposito)}</span>
+                <span className="v mono">{formatEUR(task.orcamento.deposito)}</span>
               </div>
               <div className="kv-row">
                 <span className="k">Saldo Restante</span>
-                <span className="v mono" style={{ color: task.orcamento.saldo > 0 ? "#d4a017" : "#8fbf6a" }}>{fmtBRL(task.orcamento.saldo)}</span>
+                <span className="v mono" style={{ color: task.orcamento.saldo > 0 ? "#d4a017" : "#8fbf6a" }}>{formatEUR(task.orcamento.saldo)}</span>
               </div>
             </div>
-            <div className="card-foot" style={{ flexWrap: "wrap" }}>
-              <Button variant="ghost" size="sm" icon={Icon.Edit} onClick={() => onEditQuote(task.id)}>Editar</Button>
-              {task.orcamento.status === "Pendente" ? (
-                <Button variant="secondary" size="sm" icon={Icon.Check} onClick={() => onApproveQuote(task.id)}>Aprovar</Button>
-              ) : null}
-              {task.orcamento.status === "Aprovado" ? (
-                <Button size="sm" icon={Icon.Send} onClick={() => onSendQuote(task.id)}>Enviar p/ cliente</Button>
-              ) : null}
-              <Button variant="ghost" size="sm" icon={Icon.RefreshCw} onClick={() => onResendQuote(task.id)}>Reenviar</Button>
-            </div>
+            {!readOnly ? (
+              <div className="card-foot" style={{ flexWrap: "wrap" }}>
+                <Button variant="ghost" size="sm" icon={Icon.Edit} onClick={() => onEditQuote(task.id)}>Editar</Button>
+                {task.orcamento.status === "Pendente" ? (
+                  <Button variant="secondary" size="sm" icon={Icon.Check} onClick={() => onApproveQuote(task.id)}>Aprovar</Button>
+                ) : null}
+                {task.orcamento.status === "Aprovado" ? (
+                  <Button size="sm" icon={Icon.Send} onClick={() => onSendQuote(task.id)}>Enviar p/ cliente</Button>
+                ) : null}
+                <Button variant="ghost" size="sm" icon={Icon.RefreshCw} onClick={() => onResendQuote(task.id)}>Reenviar</Button>
+              </div>
+            ) : null}
           </div>
         </div>
       </div>
+      {ConfirmEl}
     </div>
   );
 }

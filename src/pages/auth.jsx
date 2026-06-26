@@ -1,14 +1,24 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useCallback } from "react";
 import { Button, Field, Input, Checkbox, Brand, Icon } from "../components/ui";
 import api from "../lib/api";
 import { useAuth } from "../context/AuthContext";
+import { GoogleSignInButton } from "../components/auth/GoogleSignInButton";
+import {
+  canAccessAdmin,
+  loginWithGoogle,
+  registerAccount,
+  requestPasswordReset,
+  resetPassword,
+} from "../lib/authApi";
+
+const LOGO_SVG_URL = `${import.meta.env.BASE_URL}bgg-logo.svg`;
 
 function AuthArt({ caption }) {
   return (
     <div className="auth-art">
-      <div className="brand">
-        <span className="wm">BGG</span>
-        <span className="sub">Black Gold Garage · Admin</span>
+      <div className="brand brand--image brand--auth">
+        <img src={LOGO_SVG_URL} alt="Black Gold Garage" className="brand-logo" />
+        <span className="sub">Admin Console</span>
       </div>
       <div className="poetic">
         <div className="rule-gold"></div>
@@ -23,16 +33,82 @@ function AuthArt({ caption }) {
   );
 }
 
+function AuthDivider() {
+  return (
+    <div className="auth-divider">
+      <span>ou</span>
+    </div>
+  );
+}
+
+function AuthNotice({ children, tone = "error" }) {
+  const isSuccess = tone === "success";
+  return (
+    <div
+      style={{
+        background: isSuccess ? "rgba(194,164,109,0.08)" : "rgba(212,24,61,0.08)",
+        border: isSuccess ? "1px solid var(--gold-30)" : "1px solid rgba(212,24,61,0.4)",
+        padding: "10px 12px",
+        borderRadius: 4,
+        fontSize: 12,
+        color: isSuccess ? "var(--gold)" : "var(--destructive)",
+        display: "flex",
+        gap: 8,
+        alignItems: "center",
+      }}
+    >
+      {isSuccess ? <Icon.CheckCircle size={14}/> : <Icon.AlertTriangle size={14}/>}
+      {children}
+    </div>
+  );
+}
+
+function validatePasswordEs(pw) {
+  if (!pw) return "La contraseña es obligatoria";
+  if (pw.length < 8) return "La contraseña debe tener al menos 8 caracteres";
+  if (!(/[A-Z]/.test(pw) && /[a-z]/.test(pw) && /\d/.test(pw) && /[^A-Za-z0-9]/.test(pw))) {
+    return "La contraseña debe incluir mayúscula, minúscula, número y carácter especial";
+  }
+  return null;
+}
+
+function validatePassword(pw) {
+  if (!pw) return "Senha é obrigatória";
+  if (pw.length < 8) return "A senha deve ter pelo menos 8 caracteres";
+  if (!(/[A-Z]/.test(pw) && /[a-z]/.test(pw) && /\d/.test(pw) && /[^A-Za-z0-9]/.test(pw))) {
+    return "A senha deve incluir letra maiúscula, minúscula, número e caractere especial";
+  }
+  return null;
+}
+
 // ----- Login -----
 function LoginScreen({ onAuthed, onGo }) {
   const { login } = useAuth();
   const [email, setEmail] = useState("");
   const [senha, setSenha] = useState("");
   const [showPass, setShowPass] = useState(false);
-  const [remember, setRemember] = useState(true);
+  const [remember, setRemember] = useState(false);
   const [err, setErr] = useState({});
   const [generic, setGeneric] = useState("");
   const [loading, setLoading] = useState(false);
+
+  const handleGoogle = useCallback(async (idToken) => {
+    setGeneric("");
+    setLoading(true);
+    try {
+      const data = await loginWithGoogle(idToken);
+      if (canAccessAdmin(data.user)) {
+        login(data.access_token, data.user, { remember });
+        onAuthed && onAuthed(data.user);
+        return;
+      }
+      setGeneric("Conta sem permissão para acessar o console.");
+    } catch {
+      setGeneric("Não foi possível entrar com Google. Tente novamente.");
+    } finally {
+      setLoading(false);
+    }
+  }, [login, onAuthed, remember]);
 
   const submit = async (e) => {
     e.preventDefault();
@@ -49,13 +125,13 @@ function LoginScreen({ onAuthed, onGo }) {
     setLoading(true);
     try {
       const { data } = await api.post('/auth/login', { email, password: senha });
-      if (data.user?.role !== 'ADMIN') {
-        setGeneric('Acesso restrito a administradores. Use admin@bgggarage.com ou outra conta ADMIN.');
+      if (!canAccessAdmin(data.user)) {
+        setGeneric("Conta sem permissão para acessar o console.");
         return;
       }
-      login(data.access_token, data.user);
+      login(data.access_token, data.user, { remember });
       onAuthed && onAuthed(data.user);
-    } catch (err) {
+    } catch {
       setGeneric("E-mail ou senha incorretos. Tente novamente.");
     } finally {
       setLoading(false);
@@ -69,26 +145,18 @@ function LoginScreen({ onAuthed, onGo }) {
         body: "Gerencie orçamentos, técnicos e o QA das tarefas com a mesma atenção minuciosa que dedicamos a cada veículo."
       }}/>
       <div className="auth-form-wrap">
-        <form className="auth-form" onSubmit={submit}>
+        <form className="auth-form" onSubmit={submit} autoComplete="off">
           <div className="heading">
             <span className="eye">Entrar</span>
             <h2>Bem-vindo de volta.</h2>
             <p>Acesse o console administrativo para gerenciar tarefas, orçamentos e a operação do estúdio.</p>
           </div>
 
-          {generic ? (
-            <div style={{
-              background: "rgba(212,24,61,0.08)",
-              border: "1px solid rgba(212,24,61,0.4)",
-              padding: "10px 12px",
-              borderRadius: 4,
-              fontSize: 12,
-              color: "var(--destructive)",
-              display: "flex", gap: 8, alignItems: "center"
-            }}>
-              <Icon.AlertTriangle size={14}/> {generic}
-            </div>
-          ) : null}
+          {generic ? <AuthNotice>{generic}</AuthNotice> : null}
+
+          <GoogleSignInButton onCredential={handleGoogle} disabled={loading} />
+
+          <AuthDivider/>
 
           <Field label="Endereço de E-mail" error={err.email}>
             <Input
@@ -99,6 +167,8 @@ function LoginScreen({ onAuthed, onGo }) {
               onChange={(e) => setEmail(e.target.value)}
               err={!!err.email}
               autoFocus
+              autoComplete="off"
+              name="bgg-admin-email"
             />
           </Field>
 
@@ -115,6 +185,8 @@ function LoginScreen({ onAuthed, onGo }) {
               }
               onChange={(e) => setSenha(e.target.value)}
               err={!!err.senha}
+              autoComplete="new-password"
+              name="bgg-admin-password"
             />
           </Field>
 
@@ -140,32 +212,20 @@ function LoginScreen({ onAuthed, onGo }) {
   );
 }
 
-// ----- Register (via invite) -----
-function RegisterScreen({ onAuthed, onGo }) {
-  const [first, setFirst] = useState("Ana");
-  const [last, setLast] = useState("Coordenadora");
-  const [email, setEmail] = useState("ana@blackgoldgarage.com.br");
+// ----- Register -----
+function RegisterScreen({ onGo, onAuthed }) {
+  const { login } = useAuth();
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
   const [pw, setPw] = useState("");
   const [pw2, setPw2] = useState("");
   const [showA, setShowA] = useState(false);
   const [showB, setShowB] = useState(false);
   const [err, setErr] = useState({});
+  const [generic, setGeneric] = useState("");
+  const [loading, setLoading] = useState(false);
 
-  const submit = (e) => {
-    e.preventDefault();
-    const next = {};
-    if (!pw) next.pw = "Senha é obrigatória";
-    else if (pw.length < 8) next.pw = "A senha deve ter pelo menos 8 caracteres";
-    else if (!(/[A-Z]/.test(pw) && /[a-z]/.test(pw) && /\d/.test(pw) && /[^A-Za-z0-9]/.test(pw)))
-      next.pw = "A senha deve incluir letra maiúscula, minúscula, número e caractere especial";
-    if (!pw2) next.pw2 = "Por favor, confirme sua senha.";
-    else if (pw && pw2 && pw !== pw2) next.pw2 = "As senhas não coincidem";
-    setErr(next);
-    if (Object.keys(next).length) return;
-    onAuthed && onAuthed({ email });
-  };
-
-  // simple password strength
   const strength = useMemo(() => {
     let s = 0;
     if (pw.length >= 8) s++;
@@ -175,34 +235,105 @@ function RegisterScreen({ onAuthed, onGo }) {
     return s;
   }, [pw]);
 
+  const handleGoogle = useCallback(async (idToken) => {
+    setGeneric("");
+    setLoading(true);
+    try {
+      const data = await loginWithGoogle(idToken);
+      if (canAccessAdmin(data.user)) {
+        login(data.access_token, data.user);
+        onAuthed && onAuthed(data.user);
+        return;
+      }
+      setGeneric("Conta sem permissão para acessar o console.");
+    } catch (err) {
+      const msg = err.response?.data?.message;
+      setGeneric(Array.isArray(msg) ? msg.join(", ") : msg || "Não foi possível cadastrar com Google.");
+    } finally {
+      setLoading(false);
+    }
+  }, [login, onAuthed]);
+
+  const submit = async (e) => {
+    e.preventDefault();
+    const next = {};
+    if (!name.trim()) next.name = "Nome é obrigatório";
+    if (!email) next.email = "Endereço de e-mail é obrigatório";
+    else if (!/^\S+@\S+\.\S+$/.test(email)) next.email = "Digite um endereço de e-mail válido";
+    const pwErr = validatePassword(pw);
+    if (pwErr) next.pw = pwErr;
+    if (!pw2) next.pw2 = "Por favor, confirme sua senha.";
+    else if (pw && pw2 && pw !== pw2) next.pw2 = "As senhas não coincidem";
+    setErr(next);
+    if (Object.keys(next).length) return;
+
+    setGeneric("");
+    setLoading(true);
+    try {
+      const data = await registerAccount({
+        name: name.trim(),
+        email: email.trim(),
+        password: pw,
+        phone: phone.trim() || undefined,
+      });
+      login(data.access_token, data.user);
+      onAuthed && onAuthed(data.user);
+    } catch (err) {
+      const msg = err.response?.data?.message;
+      setGeneric(Array.isArray(msg) ? msg.join(", ") : msg || "Não foi possível criar a conta.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="auth-wrap">
       <AuthArt caption={{
-        title: <>Sua bancada<br/><i>aguarda.</i></>,
-        body: "Você foi convidado a se juntar ao console administrativo da Black Gold Garage. Defina sua senha para começar."
+        title: <>Junte-se à<br/><i>equipe BGG.</i></>,
+        body: "Cadastre-se como técnico para acessar tarefas e operação pelo app mobile da Black Gold Garage."
       }}/>
       <div className="auth-form-wrap">
         <form className="auth-form" onSubmit={submit}>
           <div className="heading">
-            <span className="eye">Convite para Registro</span>
-            <h2>Crie seu acesso.</h2>
-            <p>Os campos de identificação foram pré-preenchidos pelo administrador que enviou seu convite.</p>
+            <span className="eye">Cadastro</span>
+            <h2>Crie sua conta.</h2>
+            <p>Cadastre-se como técnico para acessar o console em modo visualização (orçamentos editáveis).</p>
           </div>
 
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-            <Field label="Primeiro Nome">
-              <Input value={first} onChange={(e) => setFirst(e.target.value)} disabled style={{ opacity: 0.75 }}/>
-            </Field>
-            <Field label="Sobrenome">
-              <Input value={last} onChange={(e) => setLast(e.target.value)} disabled style={{ opacity: 0.75 }}/>
-            </Field>
-          </div>
+          {generic ? <AuthNotice>{generic}</AuthNotice> : null}
 
-          <Field label="Endereço de E-mail">
+          <GoogleSignInButton onCredential={handleGoogle} disabled={loading} />
+
+          <AuthDivider/>
+
+          <Field label="Nome completo" error={err.name}>
             <Input
+              placeholder="Seu nome"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              err={!!err.name}
+              autoFocus
+            />
+          </Field>
+
+          <Field label="Endereço de E-mail" error={err.email}>
+            <Input
+              type="email"
+              placeholder="seu@email.com.br"
               value={email}
               leading={<Icon.Mail size={14}/>}
-              disabled style={{ opacity: 0.75 }}
+              onChange={(e) => setEmail(e.target.value)}
+              err={!!err.email}
+            />
+          </Field>
+
+          <Field label="Telefone (opcional)">
+            <Input
+              type="tel"
+              placeholder="+55 11 9 9999-9999"
+              value={phone}
+              leading={<Icon.Phone size={14}/>}
+              onChange={(e) => setPhone(e.target.value)}
             />
           </Field>
 
@@ -248,7 +379,10 @@ function RegisterScreen({ onAuthed, onGo }) {
             />
           </Field>
 
-          <Button type="submit" size="lg">Criar conta <Icon.ArrowRight size={14}/></Button>
+          <Button type="submit" size="lg" disabled={loading}>
+            {loading ? "Criando…" : "Criar conta"}
+            {!loading ? <Icon.ArrowRight size={14}/> : null}
+          </Button>
 
           <div className="links" style={{ justifyContent: "center", gap: 8 }}>
             <span style={{ color: "var(--fg-6)" }}>Já tem conta?</span>
@@ -265,34 +399,49 @@ function ForgotScreen({ onGo }) {
   const [email, setEmail] = useState("");
   const [sent, setSent] = useState(false);
   const [err, setErr] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  const send = async () => {
+    if (!email) { setErr("La dirección de correo es obligatoria"); return; }
+    if (!/^\S+@\S+\.\S+$/.test(email)) { setErr("Introduzca una dirección de correo válida"); return; }
+    setErr("");
+    setLoading(true);
+    try {
+      await requestPasswordReset(email);
+      setSent(true);
+    } catch (err) {
+      const msg = err.response?.data?.message;
+      setErr(Array.isArray(msg) ? msg.join(", ") : msg || "No se pudieron enviar las instrucciones.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const submit = (e) => {
     e.preventDefault();
-    if (!email) { setErr("Endereço de e-mail é obrigatório"); return; }
-    if (!/^\S+@\S+\.\S+$/.test(email)) { setErr("Digite um endereço de e-mail válido"); return; }
-    setErr("");
-    setSent(true);
+    send();
   };
 
   return (
     <div className="auth-wrap">
       <AuthArt caption={{
-        title: <><i>Vamos restaurar</i><br/>o seu acesso.</>,
-        body: "Insira seu e-mail administrativo e enviaremos um link seguro para redefinir sua senha em poucos minutos."
+        title: <><i>Recupere</i><br/>su acceso.</>,
+        body: "Introduzca su correo administrativo y le enviaremos un enlace seguro para restablecer su contraseña en pocos minutos."
       }}/>
       <div className="auth-form-wrap">
         <form className="auth-form" onSubmit={submit}>
           <div className="heading">
-            <span className="eye">Esqueci minha senha</span>
-            <h2>Recuperar acesso.</h2>
-            <p>Digite o e-mail vinculado à sua conta administrativa para receber as instruções.</p>
+            <span className="eye">Olvidé mi contraseña</span>
+            <h2>Recuperar acceso.</h2>
+            <p>Introduzca el correo vinculado a su cuenta administrativa para recibir las instrucciones.</p>
           </div>
 
           {!sent ? (
             <>
-              <Field label="Endereço de E-mail" error={err}>
+              <Field label="Correo electrónico" error={err}>
                 <Input
                   type="email"
-                  placeholder="seu@email.com.br"
+                  placeholder="su@correo.com"
                   value={email}
                   leading={<Icon.Mail size={14}/>}
                   onChange={(e) => setEmail(e.target.value)}
@@ -300,7 +449,9 @@ function ForgotScreen({ onGo }) {
                   autoFocus
                 />
               </Field>
-              <Button type="submit" size="lg">Enviar instruções <Icon.ArrowRight size={14}/></Button>
+              <Button type="submit" size="lg" disabled={loading}>
+                {loading ? "Enviando…" : "Enviar instrucciones"} {!loading ? <Icon.ArrowRight size={14}/> : null}
+              </Button>
             </>
           ) : (
             <>
@@ -316,24 +467,23 @@ function ForgotScreen({ onGo }) {
                 <span style={{ color: "var(--gold)", marginTop: 2 }}><Icon.CheckCircle size={20}/></span>
                 <div>
                   <div style={{ color: "var(--gold)", fontSize: 13, fontWeight: 500, marginBottom: 4 }}>
-                    Instruções enviadas
+                    Instrucciones enviadas
                   </div>
                   <div style={{ fontSize: 12.5, color: "var(--fg-4)", lineHeight: 1.6 }}>
-                    Se uma conta administrativa estiver associada a <strong style={{ color: "var(--fg)" }}>{email}</strong>,
-                    enviamos um link de redefinição. Verifique também sua caixa de spam.
+                    Si existe una cuenta administrativa asociada a <strong style={{ color: "var(--fg)" }}>{email}</strong>,
+                    le hemos enviado un enlace de restablecimiento. Compruebe también la carpeta de spam.
                   </div>
                 </div>
               </div>
-              <Button variant="secondary" onClick={() => setSent(false)}>Reenviar e-mail <Icon.RefreshCw size={14}/></Button>
-              <button type="button" className="btn ghost sm" onClick={() => onGo("reset")} style={{ alignSelf: "center" }}>
-                Simular link de redefinição
-              </button>
+              <Button variant="secondary" onClick={() => { setSent(false); send(); }} disabled={loading}>
+                {loading ? "Reenviando…" : "Reenviar correo"} {!loading ? <Icon.RefreshCw size={14}/> : null}
+              </Button>
             </>
           )}
 
           <div className="links">
-            <button type="button" className="link-underline" onClick={() => onGo("login")}>Entrar</button>
-            <button type="button" className="link-underline" onClick={() => onGo("register")}>Cadastrar-se</button>
+            <button type="button" className="link-underline" onClick={() => onGo("login")}>Iniciar sesión</button>
+            <button type="button" className="link-underline" onClick={() => onGo("register")}>Registrarse</button>
           </div>
         </form>
       </div>
@@ -342,48 +492,103 @@ function ForgotScreen({ onGo }) {
 }
 
 // ----- Reset Password (after link) -----
-function ResetScreen({ onAuthed, onGo }) {
+function ResetScreen({ onGo, resetToken, onResetSuccess }) {
   const [pw, setPw] = useState("");
   const [pw2, setPw2] = useState("");
   const [err, setErr] = useState({});
-  const submit = (e) => {
+  const [generic, setGeneric] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [done, setDone] = useState(false);
+
+  const submit = async (e) => {
     e.preventDefault();
     const next = {};
-    if (!pw) next.pw = "Senha é obrigatória.";
-    else if (pw.length < 8) next.pw = "A senha deve ter pelo menos 8 caracteres";
-    else if (!(/[A-Z]/.test(pw) && /[a-z]/.test(pw) && /\d/.test(pw) && /[^A-Za-z0-9]/.test(pw)))
-      next.pw = "A senha deve incluir letra maiúscula, minúscula, número e caractere especial";
-    if (!pw2) next.pw2 = "Por favor, confirme sua senha.";
-    else if (pw && pw2 && pw !== pw2) next.pw2 = "As senhas não coincidem";
+    const pwErr = validatePasswordEs(pw);
+    if (pwErr) next.pw = pwErr;
+    if (!pw2) next.pw2 = "Confirme su contraseña.";
+    else if (pw && pw2 && pw !== pw2) next.pw2 = "Las contraseñas no coinciden";
+    if (!resetToken) next.pw = "Enlace no válido. Solicite un nuevo restablecimiento.";
     setErr(next);
     if (Object.keys(next).length) return;
-    onGo("login");
+
+    setGeneric("");
+    setLoading(true);
+    try {
+      await resetPassword(resetToken, pw);
+      setDone(true);
+      onResetSuccess?.();
+    } catch (err) {
+      const msg = err.response?.data?.message;
+      setGeneric(Array.isArray(msg) ? msg.join(", ") : msg || "No se pudo restablecer la contraseña.");
+    } finally {
+      setLoading(false);
+    }
   };
+
+  if (!resetToken) {
+    return (
+      <div className="auth-wrap">
+        <AuthArt caption={{
+          title: <>Enlace<br/><i>no válido.</i></>,
+          body: "Este enlace de restablecimiento no es válido. Solicite un nuevo correo de recuperación."
+        }}/>
+        <div className="auth-form-wrap">
+          <div className="auth-form">
+            <AuthNotice tone="error">Enlace no válido o ausente.</AuthNotice>
+            <Button size="lg" onClick={() => onGo("forgot")}>Solicitar nuevo enlace <Icon.ArrowRight size={14}/></Button>
+            <div className="links" style={{ justifyContent: "center" }}>
+              <button type="button" className="link-underline" onClick={() => onGo("login")}>Volver al inicio de sesión</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (done) {
+    return (
+      <div className="auth-wrap">
+        <AuthArt caption={{
+          title: <>Contraseña<br/><i>actualizada.</i></>,
+          body: "Su nueva contraseña ya está activa. Úsela en el próximo inicio de sesión."
+        }}/>
+        <div className="auth-form-wrap">
+          <div className="auth-form">
+            <AuthNotice tone="success">Contraseña restablecida correctamente.</AuthNotice>
+            <Button size="lg" onClick={() => onGo("login")}>Ir al inicio de sesión <Icon.ArrowRight size={14}/></Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="auth-wrap">
       <AuthArt caption={{
-        title: <>Defina sua<br/><i>nova senha.</i></>,
-        body: "Quanto mais forte a senha, mais tranquila a operação. Use letras maiúsculas, minúsculas, números e símbolos."
+        title: <>Defina su<br/><i>nueva contraseña.</i></>,
+        body: "Cuanto más segura sea la contraseña, más tranquila será la operación. Use mayúsculas, minúsculas, números y símbolos."
       }}/>
       <div className="auth-form-wrap">
         <form className="auth-form" onSubmit={submit}>
           <div className="heading">
-            <span className="eye">Redefinir Senha</span>
-            <h2>Crie uma nova senha.</h2>
-            <p>Você precisará usar essa nova senha no seu próximo login.</p>
+            <span className="eye">Restablecer contraseña</span>
+            <h2>Cree una nueva contraseña.</h2>
+            <p>Deberá usar esta nueva contraseña en su próximo inicio de sesión.</p>
           </div>
-          <Field label="Nova Senha" error={err.pw}>
+          {generic ? <AuthNotice>{generic}</AuthNotice> : null}
+          <Field label="Nueva contraseña" error={err.pw}>
             <Input type="password" placeholder="••••••••" value={pw}
               leading={<Icon.Lock size={14}/>} onChange={(e) => setPw(e.target.value)} err={!!err.pw}/>
           </Field>
-          <Field label="Confirmar Senha" error={err.pw2}>
+          <Field label="Confirmar contraseña" error={err.pw2}>
             <Input type="password" placeholder="••••••••" value={pw2}
               leading={<Icon.Lock size={14}/>} onChange={(e) => setPw2(e.target.value)} err={!!err.pw2}/>
           </Field>
-          <Button type="submit" size="lg">Redefinir senha <Icon.ArrowRight size={14}/></Button>
+          <Button type="submit" size="lg" disabled={loading}>
+            {loading ? "Guardando…" : "Restablecer contraseña"} {!loading ? <Icon.ArrowRight size={14}/> : null}
+          </Button>
           <div className="links" style={{ justifyContent: "center" }}>
-            <button type="button" className="link-underline" onClick={() => onGo("login")}>Voltar para o login</button>
+            <button type="button" className="link-underline" onClick={() => onGo("login")}>Volver al inicio de sesión</button>
           </div>
         </form>
       </div>

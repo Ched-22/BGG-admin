@@ -3,3 +3,7 @@ dist
 .DS_Store
 *.local
 .env
+.env.example
+.cursor
+PRD/
+PR_DESCRIPTION/

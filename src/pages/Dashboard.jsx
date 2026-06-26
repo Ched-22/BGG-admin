@@ -1,8 +1,16 @@
-import React, { Fragment, createElement } from "react";
-import { BGG_DATA } from "../data/bggData";
-import { Button, Icon, StatusBadge, fmtBRL } from "../components/ui";
+import React, { Fragment, createElement, useMemo } from "react";
+import { Button, Icon, PageRefreshButton, StatusBadge, formatEUR, useConfirm, useToast } from "../components/ui";
+import api from "../lib/api";
 import { needsRestock, stockLevelRatio, suggestedOrderQty } from "../lib/stock";
 import { StockLevelBar } from "./Stock";
+import { isQuotePending, quoteSortDate } from "../lib/quoteApi";
+import { countOpenTasks, isClosedTaskStatus } from "../lib/taskApi";
+import { formatISODate, todayISO } from "../lib/scheduling";
+import { buildDashboardAlerts, greetingFirstName } from "../lib/dashboardAlerts";
+import { useAuth } from "../context/AuthContext";
+
+const PT_MONTHS = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
+const PT_DOW_LONG = ["Domingo", "Segunda-feira", "Terça-feira", "Quarta-feira", "Quinta-feira", "Sexta-feira", "Sábado"];
 
 function MiniRow({ item, columns, actions }) {
   return (
@@ -47,13 +55,17 @@ function DashboardCard({ title, count, total, icon, action, children, tone = "go
 
 // ------- Today's tasks block -------
 function TodayBlock({ tasks, onOpenTask }) {
-  const todays = tasks.filter(t => t.dataAgendada === BGG_DATA.today);
+  const todays = tasks.filter(
+    (t) => t.dataAgendada === todayISO() && !isClosedTaskStatus(t.status),
+  );
+  const now = new Date();
+  const dateLabel = `${now.getDate()} ${PT_MONTHS[now.getMonth()].toLowerCase()} · ${PT_DOW_LONG[now.getDay()]}`;
   return (
     <div className="card">
       <div className="card-head">
         <h3><Icon.Calendar size={18}/> Tarefas de hoje<span className="count">{todays.length}</span></h3>
         <div className="actions">
-          <span className="eyebrow-sm" style={{ fontSize: 10 }}>21 maio · Quinta-feira</span>
+          <span className="eyebrow-sm" style={{ fontSize: 10 }}>{dateLabel}</span>
         </div>
       </div>
       <div className="card-body" style={{ padding: 0 }}>
@@ -90,6 +102,13 @@ function TodayBlock({ tasks, onOpenTask }) {
                   <td><StatusBadge>{t.tecnicoStatus !== "—" ? t.tecnicoStatus : t.status}</StatusBadge></td>
                 </tr>
               ))}
+              {todays.length === 0 ? (
+                <tr>
+                  <td colSpan="6" className="muted small" style={{ textAlign: "center", padding: 28 }}>
+                    Nenhuma tarefa agendada para hoje.
+                  </td>
+                </tr>
+              ) : null}
             </tbody>
           </table>
         </div>
@@ -98,38 +117,139 @@ function TodayBlock({ tasks, onOpenTask }) {
   );
 }
 
-function DashboardPage({ onNav, onOpenTask, onEditQuote, onApproveQuote, onSendQuote, onAssignTech, onSchedule, onRejectTask, inventory, quotes = [] }) {
-  const D = BGG_DATA;
-  const tasks = D.tasks;
-  const quotesPending = quotes.filter((q) => q.status === "Pendente");
-  const quotesReady = quotes.filter((q) => q.status === "Pronto para envio");
+function DashboardPage({
+  readOnly = false,
+  canApproveQuotes = false,
+  onNav,
+  onOpenTask,
+  onEditQuote,
+  onQuotesRefresh,
+  onTasksRefresh,
+  onRefresh,
+  onAssignTech,
+  onSchedule,
+  inventory,
+  quotes = [],
+  tasks = [],
+  technicians = [],
+}) {
+  const { user } = useAuth();
+  const [confirm, ConfirmEl] = useConfirm();
+  const toast = useToast();
+  const alerts = useMemo(
+    () => buildDashboardAlerts({ tasks, inventory, technicians }),
+    [tasks, inventory, technicians],
+  );
+  const openTasks = countOpenTasks(tasks);
+  const quotesPending = quotes
+    .filter(isQuotePending)
+    .sort((a, b) => quoteSortDate(b) - quoteSortDate(a));
   const compraUrgente = (inventory || []).filter(needsRestock);
-  const novas = tasks.filter(t => t.status === "Nova solicitação");
+  const today = todayISO();
+  const weekEnd = formatISODate(new Date(Date.now() + 7 * 86400000));
+  const proximosAgendamentos = tasks
+    .filter((t) => (
+      t.dataAgendada
+      && t.dataAgendada > today
+      && t.dataAgendada <= weekEnd
+      && !isClosedTaskStatus(t.status)
+    ))
+    .sort((a, b) => {
+      const byDate = a.dataAgendada.localeCompare(b.dataAgendada);
+      if (byDate !== 0) return byDate;
+      return (a.horario || "").localeCompare(b.horario || "");
+    });
   const naoAgendadas = tasks.filter(t => t.status === "Não agendado");
   const semTecnico = tasks.filter(t => t.status === "Sem técnico");
   const qa = tasks.filter(t => t.status === "Pronto para QA");
+
+  const handleApproveQuote = async (id) => {
+    if (!canApproveQuotes || !id) return;
+    const ok = await confirm({
+      title: "Aprovar orçamento?",
+      body: "Tem certeza de que deseja aprovar este orçamento?",
+      ok: "Aprovar",
+    });
+    if (!ok) return;
+    try {
+      await api.patch(`/quotes/${id}/approve`);
+      await onQuotesRefresh?.();
+      await onTasksRefresh?.();
+      toast({ kind: "success", title: "Orçamento aprovado", desc: `Aprovado — ${id}.` });
+    } catch {
+      toast({ kind: "error", title: "Erro ao aprovar", desc: "Não foi possível aprovar o orçamento." });
+    }
+  };
+
   return (
+    <>
+    {ConfirmEl}
     <div className="page">
       <div className="page-head">
         <div className="titles">
-          <span className="eyebrow-sm">Bom dia, Ana</span>
+          <span className="eyebrow-sm">Bom dia, {greetingFirstName(user)}</span>
           <h2 className="page-title">Visão geral da operação</h2>
-          <div className="page-sub page-sub-bold">{tasks.length} tarefas ativas · {quotesPending.length + quotesReady.length} orçamentos em aberto</div>
+          <div className="page-sub page-sub-bold">
+            {openTasks} tarefas ativas · {quotesPending.length} orçamentos pendentes
+            {proximosAgendamentos.length > 0 ? (
+              <span> · {proximosAgendamentos.length} agendadas nos próximos 7 dias</span>
+            ) : null}
+          </div>
         </div>
         <div className="row" style={{ gap: 10 }}>
-          <Button variant="secondary" icon={Icon.RefreshCw}>Atualizar</Button>
-          <Button icon={Icon.Plus} onClick={() => onNav({ page: "tasks", openCreate: true })}>Criar Tarefa</Button>
+          <PageRefreshButton onClick={onRefresh}/>
+          {!readOnly ? (
+            <Button icon={Icon.Plus} onClick={() => onNav({ page: "tasks", openCreate: true })}>Criar Tarefa</Button>
+          ) : null}
         </div>
       </div>
 
-      {/* Estoque — compras urgentes (<20%) */}
+      {/* Orçamentos & Estoque */}
       <div className="dash-section-title">
-        <span>Estoque</span>
+        <span>Orçamentos & Estoque</span>
         <div className="rule"></div>
       </div>
       <div className="dash-grid">
-        <div className="col-4">
-          <div className="card stock-dash-mini">
+        <div className="col-6">
+          <DashboardCard
+            title="Orçamentos Pendentes"
+            icon="FileText"
+            count={quotesPending.length}
+            action={<button className="link-underline" onClick={() => onNav({ page: "quotes", filter: "Pendente" })} style={{ fontSize: 10 }}>Ver todos</button>}
+          >
+            {quotesPending.length === 0 ? (
+              <div className="muted small" style={{ padding: 8 }}>Nenhum orçamento pendente de revisão.</div>
+            ) : null}
+            {quotesPending.slice(0, 6).map((q) => (
+              <div key={q.id} className="task-list-row">
+                <span className="id mono">{q.id}</span>
+                <div style={{ minWidth: 0 }}>
+                  <div className="title" style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{q.projeto}</div>
+                  <div className="meta">
+                    <span>{q.cliente}</span>
+                    <span className="dotsep"></span>
+                    <span>{q.servico}</span>
+                    <span className="dotsep"></span>
+                    <span className="warn-text" style={{ color: "#d4a017" }}>{q.idade}</span>
+                  </div>
+                </div>
+                <div className="right">
+                  <span className="amount mono" style={{ color: "var(--gold)", fontWeight: 500 }}>{formatEUR(q.valor)}</span>
+                  {!readOnly ? (
+                    <>
+                      <button type="button" className="row-action" title="Editar" onClick={(e) => { e.stopPropagation(); onEditQuote?.(q.id); }}><Icon.Edit size={14}/></button>
+                      {canApproveQuotes ? (
+                        <button type="button" className="row-action" title="Aprovar" onClick={(e) => { e.stopPropagation(); handleApproveQuote(q.id); }}><Icon.Check size={14}/></button>
+                      ) : null}
+                    </>
+                  ) : null}
+                </div>
+              </div>
+            ))}
+          </DashboardCard>
+        </div>
+        <div className="col-6">
+          <div className="card stock-dash-mini" style={{ height: "100%" }}>
             <div className="card-head">
               <h3>
                 <span style={{ color: "var(--destructive)", display: "flex" }}><Icon.Package size={18}/></span>
@@ -163,77 +283,6 @@ function DashboardPage({ onNav, onOpenTask, onEditQuote, onApproveQuote, onSendQ
             </div>
           </div>
         </div>
-        <div className="col-8">
-          <div className="muted small" style={{ padding: "12px 0 0", lineHeight: 1.6 }}>
-            Produtos com nível <strong>abaixo de 20%</strong> da capacidade máxima do depósito entram aqui automaticamente.
-            Use a página <button type="button" className="link-underline" onClick={() => onNav({ page: "stock" })} style={{ fontSize: "inherit" }}>Estoque</button> para visão completa, filtros e simulação de entrada.
-          </div>
-        </div>
-      </div>
-
-      {/* Section: Orçamentos */}
-      <div className="dash-section-title">
-        <span>Orçamentos</span>
-        <div className="rule"></div>
-      </div>
-      <div className="dash-grid">
-        {/* Pending */}
-        <div className="col-6">
-          <DashboardCard
-            title="Orçamentos Pendentes"
-            icon="FileText"
-            count={quotesPending.length}
-            action={<button className="link-underline" onClick={() => onNav({ page: "quotes", filter: "Pendente" })} style={{ fontSize: 10 }}>Ver todos</button>}
-          >
-            {quotesPending.slice(0, 4).map((q) => (
-              <div key={q.id} className="task-list-row">
-                <span className="id mono">{q.id}</span>
-                <div style={{ minWidth: 0 }}>
-                  <div className="title" style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{q.projeto}</div>
-                  <div className="meta">
-                    <span>{q.cliente}</span>
-                    <span className="dotsep"></span>
-                    <span>{q.servico}</span>
-                    <span className="dotsep"></span>
-                    <span className="warn-text" style={{ color: "#d4a017" }}>{q.idade}</span>
-                  </div>
-                </div>
-                <div className="right">
-                  <span className="amount mono" style={{ color: "var(--gold)", fontWeight: 500 }}>{fmtBRL(q.valor)}</span>
-                  <button className="row-action" title="Editar" onClick={() => onEditQuote(q.id)}><Icon.Edit size={14}/></button>
-                  <button className="row-action" title="Aprovar" onClick={() => onApproveQuote(q.id)}><Icon.Check size={14}/></button>
-                </div>
-              </div>
-            ))}
-          </DashboardCard>
-        </div>
-        {/* Ready */}
-        <div className="col-6">
-          <DashboardCard
-            title="Prontos para Enviar"
-            icon="Send"
-            count={quotesReady.length}
-            action={<button className="link-underline" onClick={() => onNav({ page: "quotes", filter: "Pronto para envio" })} style={{ fontSize: 10 }}>Ver todos</button>}
-          >
-            {quotesReady.map((q) => (
-              <div key={q.id} className="task-list-row">
-                <span className="id mono">{q.id}</span>
-                <div style={{ minWidth: 0 }}>
-                  <div className="title" style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{q.projeto}</div>
-                  <div className="meta">
-                    <span>{q.cliente}</span>
-                    <span className="dotsep"></span>
-                    <span>{q.servico}</span>
-                  </div>
-                </div>
-                <div className="right">
-                  <span className="amount mono" style={{ color: "var(--gold)", fontWeight: 500 }}>{fmtBRL(q.valor)}</span>
-                  <Button size="sm" onClick={() => onSendQuote(q.id)}>Enviar</Button>
-                </div>
-              </div>
-            ))}
-          </DashboardCard>
-        </div>
       </div>
 
       {/* Section: Tarefas */}
@@ -243,19 +292,7 @@ function DashboardPage({ onNav, onOpenTask, onEditQuote, onApproveQuote, onSendQ
       </div>
       <div className="dash-grid">
         {/* KPIs */}
-        <div className="col-3">
-          <div className="kpi tall" onClick={() => onNav({ page: "tasks", filter: "novas" })} style={{ cursor: "pointer" }}>
-            <div className="row" style={{ justifyContent: "space-between" }}>
-              <span className="label" style={{ fontSize: 10, letterSpacing: "0.18em", textTransform: "uppercase", color: "var(--fg-5)" }}>Novas solicitações</span>
-              <Icon.UserPlus size={14} style={{ color: "var(--gold)" }}/>
-            </div>
-            <div className="stat">
-              <div className="num warn">{novas.length}</div>
-              <div className="delta">Aguardando triagem</div>
-            </div>
-          </div>
-        </div>
-        <div className="col-3">
+        <div className="col-4">
           <div className="kpi tall" onClick={() => onNav({ page: "tasks", filter: "naoAgendadas" })} style={{ cursor: "pointer" }}>
             <div className="row" style={{ justifyContent: "space-between" }}>
               <span className="label" style={{ fontSize: 10, letterSpacing: "0.18em", textTransform: "uppercase", color: "var(--fg-5)" }}>Não agendadas</span>
@@ -267,7 +304,7 @@ function DashboardPage({ onNav, onOpenTask, onEditQuote, onApproveQuote, onSendQ
             </div>
           </div>
         </div>
-        <div className="col-3">
+        <div className="col-4">
           <div className="kpi tall" onClick={() => onNav({ page: "tasks", filter: "semTecnico" })} style={{ cursor: "pointer" }}>
             <div className="row" style={{ justifyContent: "space-between" }}>
               <span className="label" style={{ fontSize: 10, letterSpacing: "0.18em", textTransform: "uppercase", color: "var(--fg-5)" }}>Sem técnico</span>
@@ -279,7 +316,7 @@ function DashboardPage({ onNav, onOpenTask, onEditQuote, onApproveQuote, onSendQ
             </div>
           </div>
         </div>
-        <div className="col-3">
+        <div className="col-4">
           <div className="kpi tall" onClick={() => onNav({ page: "tasks", filter: "qa" })} style={{ cursor: "pointer" }}>
             <div className="row" style={{ justifyContent: "space-between" }}>
               <span className="label" style={{ fontSize: 10, letterSpacing: "0.18em", textTransform: "uppercase", color: "var(--fg-5)" }}>Pronto para QA</span>
@@ -292,17 +329,30 @@ function DashboardPage({ onNav, onOpenTask, onEditQuote, onApproveQuote, onSendQ
           </div>
         </div>
 
-        {/* Novas solicitações detail */}
+        {/* Próximos agendamentos (7 dias) */}
         <div className="col-6">
           <DashboardCard
-            title="Novas Solicitações de Tarefa"
-            icon="UserPlus"
-            count={novas.length}
-            action={<button className="link-underline" onClick={() => onNav({ page: "tasks", filter: "novas" })} style={{ fontSize: 10 }}>Ver todas</button>}
+            title="Próximos agendamentos"
+            icon="Calendar"
+            count={proximosAgendamentos.length}
+            action={(
+              <button
+                type="button"
+                className="link-underline"
+                onClick={() => onNav({ page: "calendar" })}
+                style={{ fontSize: 10 }}
+              >
+                Ver calendário
+              </button>
+            )}
           >
-            {novas.length === 0 ? <div className="muted small" style={{ padding: 8 }}>Nenhuma nova solicitação no momento.</div> : null}
-            {novas.map((t) => (
-              <div key={t.id} className="task-list-row">
+            {proximosAgendamentos.length === 0 ? (
+              <div className="muted small" style={{ padding: 8 }}>
+                Nenhuma tarefa agendada para os próximos 7 dias.
+              </div>
+            ) : null}
+            {proximosAgendamentos.slice(0, 6).map((t) => (
+              <div key={t.id} className="task-list-row" onClick={() => onOpenTask(t.id)} role="button">
                 <span className="id mono">{t.id}</span>
                 <div style={{ minWidth: 0 }}>
                   <div className="title" style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{t.projeto}</div>
@@ -310,12 +360,17 @@ function DashboardPage({ onNav, onOpenTask, onEditQuote, onApproveQuote, onSendQ
                     <span>{t.cliente}</span>
                     <span className="dotsep"></span>
                     <span>{t.servico}</span>
+                    <span className="dotsep"></span>
+                    <span style={{ color: "var(--gold)" }}>{t.dataAgendada} · {t.horario || "—"}</span>
                   </div>
                 </div>
                 <div className="right">
-                  <Button size="sm" variant="secondary" onClick={() => onOpenTask(t.id)}>Ver</Button>
-                  <button className="row-action" title="Contatar"><Icon.Phone size={14}/></button>
-                  <button className="row-action danger" title="Rejeitar" onClick={() => onRejectTask(t.id)}><Icon.XCircle size={14}/></button>
+                  {t.tecnico ? (
+                    <span className="muted small">{t.tecnico.split(" ").pop()}</span>
+                  ) : (
+                    <span className="warn-text" style={{ color: "#d4a017", fontSize: 10 }}>Sem técnico</span>
+                  )}
+                  <StatusBadge>{t.status}</StatusBadge>
                 </div>
               </div>
             ))}
@@ -345,7 +400,11 @@ function DashboardPage({ onNav, onOpenTask, onEditQuote, onApproveQuote, onSendQ
                   </div>
                 </div>
                 <div className="right">
-                  <Button size="sm" onClick={() => onAssignTech(t.id)}>Designar</Button>
+                  {!readOnly ? (
+                    <Button size="sm" onClick={() => onAssignTech(t.id)}>Designar</Button>
+                  ) : (
+                    <Button size="sm" variant="secondary" onClick={() => onOpenTask(t.id)}>Ver</Button>
+                  )}
                 </div>
               </div>
             ))}
@@ -374,7 +433,11 @@ function DashboardPage({ onNav, onOpenTask, onEditQuote, onApproveQuote, onSendQ
                   </div>
                 </div>
                 <div className="right">
-                  <Button size="sm" onClick={() => onSchedule(t.id)}>Agendar</Button>
+                  {!readOnly ? (
+                    <Button size="sm" onClick={(e) => { e.stopPropagation(); onSchedule(t.id); }}>Agendar</Button>
+                  ) : (
+                    <Button size="sm" variant="secondary" onClick={(e) => { e.stopPropagation(); onOpenTask(t.id); }}>Ver</Button>
+                  )}
                 </div>
               </div>
             ))}
@@ -399,7 +462,7 @@ function DashboardPage({ onNav, onOpenTask, onEditQuote, onApproveQuote, onSendQ
                     <span className="dotsep"></span>
                     <span>{t.servico}</span>
                     <span className="dotsep"></span>
-                    <span>Concluída {t.qa.concluidoEm.split(" ")[0]}</span>
+                    <span>Concluída {(t.qa?.concluidoEm || "—").split(" ")[0]}</span>
                   </div>
                 </div>
                 <div className="right">
@@ -416,8 +479,11 @@ function DashboardPage({ onNav, onOpenTask, onEditQuote, onApproveQuote, onSendQ
         </div>
 
         <div className="col-12">
-          <DashboardCard title="Alertas" icon="AlertTriangle" count={D.alerts.length} tone="danger">
-            {D.alerts.map((a, i) => {
+          <DashboardCard title="Alertas" icon="AlertTriangle" count={alerts.length} tone="danger">
+            {alerts.length === 0 ? (
+              <div className="muted small" style={{ padding: 8 }}>Nenhum alerta no momento.</div>
+            ) : null}
+            {alerts.map((a, i) => {
               const ico = a.kind === "success" ? Icon.CheckCircle : a.kind === "danger" ? Icon.XCircle : a.kind === "warn" ? Icon.AlertTriangle : Icon.Info;
               const c = a.kind === "success" ? "#8fbf6a" : a.kind === "danger" ? "var(--destructive)" : a.kind === "warn" ? "#d4a017" : "var(--neutral)";
               return (
@@ -437,6 +503,7 @@ function DashboardPage({ onNav, onOpenTask, onEditQuote, onApproveQuote, onSendQ
         </div>
       </div>
     </div>
+    </>
   );
 }
 

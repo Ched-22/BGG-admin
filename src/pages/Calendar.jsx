@@ -1,8 +1,11 @@
-import React, { useState, Fragment } from "react";
+import React, { useState, Fragment, useMemo } from "react";
 import { BGG_DATA } from "../data/bggData";
-import { Button, Icon } from "../components/ui";
+import { Button, Icon, PageRefreshButton } from "../components/ui";
+import { ExportMenu } from "../components/ExportMenu";
+import { CALENDAR_EXPORT_COLUMNS } from "../lib/exportColumns";
 import { ScheduleModal } from "../components/modals/TaskModals";
-import { formatDurationHours } from "../lib/scheduling";
+import { mapTechniciansForPicker } from "../lib/technicianApi";
+import { formatDurationHours, buildMonthDays, formatISODate, todayISO, getEventSlot, getWeekGridEndHour, formatEventTimeRange, WORK_START_MIN } from "../lib/scheduling";
 
 const PT_MONTHS = ["Janeiro","Fevereiro","Março","Abril","Maio","Junho","Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"];
 const PT_DOW_LONG = ["Domingo","Segunda","Terça","Quarta","Quinta","Sexta","Sábado"];
@@ -12,20 +15,37 @@ function serviceClass(s) {
   if (!s) return "";
   if (s.includes("Exterior")) return "s-ext";
   if (s.includes("Interior") || s.includes("Couro") || s.includes("Higienização")) return "s-int";
-  if (s.includes("Cerâmica") || s.includes("Vitrificação") || s.includes("Polimento")) return "s-cer";
+  if (s.includes("Cerâmica") || s.includes("Vitrificação") || s.includes("Polimento") || s.includes("Proteção")) return "s-cer";
   if (s.includes("PPF")) return "s-ppf";
   if (s.includes("Motos")) return "s-mot";
   return "";
 }
 
-function CalendarPage({ onOpenTask, events = [], tasks = [], onSaveSchedule }) {
-  // Default to May 2026
-  const [cursor, setCursor] = useState({ y: 2026, m: 4 }); // m is 0-indexed
+/** Marcador compacto no horário agendado (sem altura proporcional à duração). */
+function buildWeekEventMarkers(dayEvents) {
+  const byStart = new Map();
+  for (const e of dayEvents) {
+    const start = getEventSlot(e).start;
+    if (!byStart.has(start)) byStart.set(start, []);
+    byStart.get(start).push(e);
+  }
+  return dayEvents.map((e) => {
+    const start = getEventSlot(e).start;
+    const siblings = byStart.get(start) || [e];
+    const laneIndex = siblings.findIndex((x) => x.id === e.id);
+    return { event: e, start, laneIndex, laneCount: siblings.length };
+  });
+}
+
+function CalendarPage({ readOnly = false, onOpenTask, events = [], tasks = [], technicians = [], onSaveSchedule, onRefresh }) {
+  const now = new Date();
+  const [cursor, setCursor] = useState({ y: now.getFullYear(), m: now.getMonth() });
   const [view, setView] = useState("month"); // month | week | day
-  const [selectedDate, setSelectedDate] = useState("2026-05-21");
+  const [selectedDate, setSelectedDate] = useState(todayISO());
   const [techFilter, setTechFilter] = useState("Todos");
   const [serviceFilter, setServiceFilter] = useState("Todos");
   const [showCreate, setShowCreate] = useState(false);
+  const techPicker = useMemo(() => mapTechniciansForPicker(technicians), [technicians]);
 
   const filteredEvents = events.filter(e =>
     (techFilter === "Todos" || e.tecnico === techFilter) &&
@@ -33,18 +53,9 @@ function CalendarPage({ onOpenTask, events = [], tasks = [], onSaveSchedule }) {
   );
 
   // Build month grid (always 6 weeks)
-  const firstOfMonth = new Date(cursor.y, cursor.m, 1);
-  const startDow = firstOfMonth.getDay();
-  const gridStart = new Date(cursor.y, cursor.m, 1 - startDow);
-  const days = [];
-  for (let i = 0; i < 42; i++) {
-    const d = new Date(gridStart);
-    d.setDate(d.getDate() + i);
-    days.push(d);
-  }
-  const todayISO = BGG_DATA.today;
+  const days = buildMonthDays(cursor.y, cursor.m);
+  const todayISOValue = todayISO();
 
-  const formatISO = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
   const eventsForDay = (iso) => filteredEvents.filter(e => e.data === iso).sort((a, b) => (a.horario || "").localeCompare(b.horario || ""));
 
   const selDate = new Date(selectedDate + "T00:00:00");
@@ -58,7 +69,17 @@ function CalendarPage({ onOpenTask, events = [], tasks = [], onSaveSchedule }) {
     d.setDate(d.getDate() + i);
     return d;
   });
-  const hours = Array.from({ length: 11 }, (_, i) => i + 8); // 08..18
+  const weekIsos = weekDays.map((d) => formatISODate(d));
+  const gridEndHour = useMemo(
+    () => getWeekGridEndHour(filteredEvents, weekIsos),
+    [filteredEvents, weekIsos.join("|")],
+  );
+  const hours = useMemo(
+    () => Array.from({ length: gridEndHour - 8 + 1 }, (_, i) => i + 8),
+    [gridEndHour],
+  );
+  const hourCount = hours.length;
+  const weekGridMinutes = hourCount * 60;
 
   return (
     <>
@@ -70,8 +91,20 @@ function CalendarPage({ onOpenTask, events = [], tasks = [], onSaveSchedule }) {
             <div className="page-sub">{filteredEvents.length} tarefas agendadas · visão consolidada da operação</div>
           </div>
           <div className="row" style={{ gap: 10 }}>
-            <Button variant="secondary" icon={Icon.Download}>Exportar</Button>
-            <Button icon={Icon.Plus} onClick={() => setShowCreate(true)}>Novo agendamento</Button>
+            <PageRefreshButton onClick={onRefresh}/>
+            <ExportMenu
+              filenameBase="calendario"
+              sheetName="Calendário"
+              columns={CALENDAR_EXPORT_COLUMNS}
+              rows={[...filteredEvents].sort((a, b) => {
+                const byDate = (a.data || '').localeCompare(b.data || '');
+                if (byDate !== 0) return byDate;
+                return (a.horario || '').localeCompare(b.horario || '');
+              })}
+            />
+            {!readOnly ? (
+              <Button icon={Icon.Plus} onClick={() => setShowCreate(true)}>Novo agendamento</Button>
+            ) : null}
           </div>
         </div>
 
@@ -93,14 +126,18 @@ function CalendarPage({ onOpenTask, events = [], tasks = [], onSaveSchedule }) {
             const m = cursor.m + 1;
             setCursor(m > 11 ? { y: cursor.y + 1, m: 0 } : { y: cursor.y, m });
           }}><Icon.Chevron size={14}/></button>
-          <Button size="sm" variant="ghost" onClick={() => { setCursor({ y: 2026, m: 4 }); setSelectedDate("2026-05-21"); }}>Hoje</Button>
+          <Button size="sm" variant="ghost" onClick={() => {
+            const t = new Date();
+            setCursor({ y: t.getFullYear(), m: t.getMonth() });
+            setSelectedDate(formatISODate(t));
+          }}>Hoje</Button>
 
           <div style={{ flex: 1 }}/>
 
           <div className="select-wrap">
             <select className="select" value={techFilter} onChange={(e) => setTechFilter(e.target.value)} style={{ minWidth: 180 }}>
               <option value="Todos">Técnico: Todos</option>
-              {BGG_DATA.techs.map(t => <option key={t.name}>{t.name}</option>)}
+              {techPicker.map((t) => <option key={t.id || t.name} value={t.name}>{t.name}</option>)}
             </select>
           </div>
           <div className="select-wrap">
@@ -135,9 +172,9 @@ function CalendarPage({ onOpenTask, events = [], tasks = [], onSaveSchedule }) {
               <div className="cal">
                 {PT_DOW_SHORT.map(d => <div key={d} className="h">{d.slice(0, 1)}</div>)}
                 {days.map((d, i) => {
-                  const iso = formatISO(d);
+                  const iso = formatISODate(d);
                   const inMonth = d.getMonth() === cursor.m;
-                  const isToday = iso === todayISO;
+                  const isToday = iso === todayISOValue;
                   const sel = iso === selectedDate;
                   const has = filteredEvents.some(e => e.data === iso);
                   return (
@@ -186,8 +223,8 @@ function CalendarPage({ onOpenTask, events = [], tasks = [], onSaveSchedule }) {
                   style={{ cursor: "pointer" }}
                 >
                   <div>
-                    <div className="time">{e.horario}</div>
-                    <div className="tiny muted">{e.duracao}min</div>
+                    <div className="time">{formatEventTimeRange({ ...e, data: e.data })}</div>
+                    <div className="tiny muted">{formatDurationHours(e.duracaoHoras ?? (e.duracao ? e.duracao / 60 : 1.5))}</div>
                   </div>
                   <div style={{ minWidth: 0 }}>
                     <div className="ttl">{e.title}</div>
@@ -213,10 +250,10 @@ function CalendarPage({ onOpenTask, events = [], tasks = [], onSaveSchedule }) {
                     <div key={d} className="cell head dow">{d}</div>
                   ))}
                   {days.map((d, i) => {
-                    const iso = formatISO(d);
+                    const iso = formatISODate(d);
                     const dayEvs = eventsForDay(iso);
                     const inMonth = d.getMonth() === cursor.m;
-                    const isToday = iso === todayISO;
+                    const isToday = iso === todayISOValue;
                     const sel = iso === selectedDate;
                     return (
                       <div
@@ -247,17 +284,21 @@ function CalendarPage({ onOpenTask, events = [], tasks = [], onSaveSchedule }) {
               </div>
             ) : (
               <div className="cal-week">
-                <div className="cal-week-grid">
-                  <div className="cell head corner" aria-hidden="true" />
+                <div
+                  className="cal-week-grid"
+                  style={{ gridTemplateRows: `60px repeat(${hourCount}, 1fr)` }}
+                >
+                  <div className="cell head corner" style={{ gridColumn: 1, gridRow: 1 }} aria-hidden="true" />
                   {weekDays.map((d, i) => {
-                    const iso = formatISO(d);
-                    const isToday = iso === todayISO;
+                    const iso = formatISODate(d);
+                    const isToday = iso === todayISOValue;
                     const isSelected = iso === selectedDate;
                     return (
                       <button
                         key={i}
                         type="button"
                         className={`cell head dow ${isToday ? "today" : ""} ${isSelected ? "selected" : ""}`}
+                        style={{ gridColumn: i + 2, gridRow: 1 }}
                         onClick={() => setSelectedDate(iso)}
                       >
                         <span>{PT_DOW_SHORT[d.getDay()]}</span>
@@ -265,42 +306,66 @@ function CalendarPage({ onOpenTask, events = [], tasks = [], onSaveSchedule }) {
                       </button>
                     );
                   })}
-                  {hours.map((h) => (
+                  {hours.map((h, hi) => (
                     <Fragment key={h}>
-                      <div className="cell t">{String(h).padStart(2, "0")}:00</div>
+                      <div className="cell t" style={{ gridColumn: 1, gridRow: hi + 2 }}>
+                        {String(h).padStart(2, "0")}:00
+                      </div>
                       {weekDays.map((d, di) => {
-                        const iso = formatISO(d);
-                        const isToday = iso === todayISO;
+                        const iso = formatISODate(d);
+                        const isToday = iso === todayISOValue;
                         const isSelected = iso === selectedDate;
-                        const evHere = eventsForDay(iso).filter(e => parseInt(e.horario.split(":")[0], 10) === h);
                         return (
                           <div
                             key={di}
                             className={`cell slot ${isToday ? "today" : ""} ${isSelected ? "selected" : ""}`}
+                            style={{ gridColumn: di + 2, gridRow: hi + 2 }}
                             onClick={() => setSelectedDate(iso)}
-                          >
-                            {evHere.map((e) => {
-                              const mins = parseInt(e.horario.split(":")[1] || "0", 10);
-                              const topPct = (mins / 60) * 100;
-                              const heightPct = Math.min((e.duracao / 60) * 100, 100 - topPct) - 1;
-                              return (
-                                <div
-                                  key={e.id}
-                                  className={`ev ${serviceClass(e.servico) || "s-cer"}`}
-                                  style={{ top: `calc(${topPct}% + 2px)`, height: `max(${heightPct}%, 18px)` }}
-                                  onClick={(ev) => { ev.stopPropagation(); onOpenTask(e.id); }}
-                                  title={`${e.horario} · Baia ${e.baia ?? 1} · ${e.title}`}
-                                >
-                                  <span className="time">{e.horario}</span>
-                                  B{e.baia ?? 1} · {e.title}
-                                </div>
-                              );
-                            })}
-                          </div>
+                          />
                         );
                       })}
                     </Fragment>
                   ))}
+                </div>
+                <div
+                  className="cal-week-events-layer"
+                  style={{ gridTemplateRows: `60px repeat(${hourCount}, 1fr)` }}
+                >
+                  {weekDays.map((d, di) => {
+                    const iso = formatISODate(d);
+                    return (
+                      <div
+                        key={`overlay-${iso}`}
+                        className="cal-week-day-events"
+                        style={{ gridColumn: di + 2, gridRow: `2 / span ${hourCount}` }}
+                      >
+                        {buildWeekEventMarkers(eventsForDay(iso)).map(({ event: e, start, laneIndex, laneCount }) => {
+                          const topPct = ((start - WORK_START_MIN) / weekGridMinutes) * 100;
+                          const laneWidthPct = 100 / laneCount;
+                          const markerStyle = {
+                            top: `${topPct}%`,
+                            ...(laneCount > 1 ? {
+                              left: `calc(4px + ${laneIndex * laneWidthPct}%)`,
+                              right: "auto",
+                              width: `calc(${laneWidthPct}% - 6px)`,
+                            } : {}),
+                          };
+                          return (
+                            <div
+                              key={e.id}
+                              className={`ev cal-week-marker ${serviceClass(e.servico) || "s-cer"}`}
+                              style={markerStyle}
+                              onClick={(ev) => { ev.stopPropagation(); onOpenTask(e.id); }}
+                              title={`${formatEventTimeRange({ ...e, data: e.data })} · Baia ${e.baia ?? 1} · ${e.title}`}
+                            >
+                              <span className="time">{e.horario}</span>
+                              B{e.baia ?? 1} · {e.title}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             )}
@@ -309,10 +374,11 @@ function CalendarPage({ onOpenTask, events = [], tasks = [], onSaveSchedule }) {
       </div>
 
       <ScheduleModal
-        open={showCreate}
+        open={showCreate && !readOnly}
         task={null}
         tasks={tasks}
         events={events}
+        technicians={technicians}
         defaultDate={selectedDate}
         onClose={() => setShowCreate(false)}
         onSave={onSaveSchedule}
