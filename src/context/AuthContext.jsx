@@ -3,15 +3,30 @@ import {
   clearSession,
   getStoredUser,
   hasStoredSession,
+  normalizeSessionOnBoot,
+  patchStoredUser,
   registerUnauthorizedHandler,
   setSession,
 } from '../lib/auth';
 
 const AuthContext = createContext(null);
 
+function readInitialAuth() {
+  try {
+    normalizeSessionOnBoot();
+    return {
+      isAuthenticated: hasStoredSession(),
+      user: getStoredUser(),
+    };
+  } catch {
+    return { isAuthenticated: false, user: null };
+  }
+}
+
 export function AuthProvider({ children }) {
-  const [isAuthenticated, setIsAuthenticated] = useState(hasStoredSession);
-  const [user, setUser] = useState(getStoredUser);
+  const [boot] = useState(readInitialAuth);
+  const [isAuthenticated, setIsAuthenticated] = useState(boot.isAuthenticated);
+  const [user, setUser] = useState(boot.user);
   const [sessionExpired, setSessionExpired] = useState(false);
 
   useEffect(() => {
@@ -25,8 +40,8 @@ export function AuthProvider({ children }) {
     return () => registerUnauthorizedHandler(null);
   }, []);
 
-  const login = useCallback((accessToken, userData) => {
-    setSession(accessToken, userData);
+  const login = useCallback((accessToken, userData, options) => {
+    setSession(accessToken, userData, options);
     setUser(userData);
     setIsAuthenticated(true);
     setSessionExpired(false);
@@ -43,16 +58,22 @@ export function AuthProvider({ children }) {
     setSessionExpired(false);
   }, []);
 
+  const updateUser = useCallback((partial) => {
+    const next = patchStoredUser(partial);
+    if (next) setUser(next);
+  }, []);
+
   const value = useMemo(
     () => ({
       isAuthenticated,
       user,
       login,
       logout,
+      updateUser,
       sessionExpired,
       clearSessionExpired,
     }),
-    [isAuthenticated, user, login, logout, sessionExpired, clearSessionExpired],
+    [isAuthenticated, user, login, logout, updateUser, sessionExpired, clearSessionExpired],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

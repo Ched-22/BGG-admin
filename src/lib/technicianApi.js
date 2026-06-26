@@ -24,3 +24,20 @@ export async function deactivateTechnician(id) {
   const { data } = await api.delete(`/users/technicians/${id}`);
   return data;
 }
+
+export function mapTechniciansForPicker(rows) {
+  return (Array.isArray(rows) ? rows : [])
+    .filter((t) => t.active !== false)
+    .map((t) => ({
+      id: t.id,
+      name: t.name,
+      skills: Array.isArray(t.skills) ? t.skills : [],
+      serviceIds: Array.isArray(t.serviceIds) ? t.serviceIds : [],
+      serviceCodes: Array.isArray(t.serviceCodes) ? t.serviceCodes : [],
+      services: Array.isArray(t.services) ? t.services : [],
+      disponivel: t.available !== false,
+      conflito: t.hasScheduleConflict === true,
+      agenda: t.scheduleLabel || "—",
+      carga: t.activeAppointmentsCount ?? 0,
+    }));
+}
