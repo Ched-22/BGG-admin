@@ -9,6 +9,7 @@ export function mapCatalogServiceFromApi(row) {
     name: row.name,
     description: row.description || '',
     durationMinutes: row.durationMinutes,
+    serviceCategory: row.serviceCategory || 'EXTERIOR',
     active: row.active !== false,
     priceSmall: prices.priceSmall ?? 0,
     priceMedium: prices.priceMedium ?? 0,
@@ -57,6 +58,7 @@ export function mapCatalogServiceToCreate(form) {
     name: form.name?.trim(),
     description: form.description?.trim() || undefined,
     durationMinutes: Number(form.durationMinutes),
+    serviceCategory: form.serviceCategory || 'EXTERIOR',
     priceSmall: Number(form.priceSmall),
     priceMedium: Number(form.priceMedium),
     priceLarge: Number(form.priceLarge),
@@ -68,6 +70,7 @@ export function mapCatalogServiceToUpdate(form) {
   if (form.name != null) body.name = form.name.trim();
   if (form.description != null) body.description = form.description.trim() || '';
   if (form.durationMinutes != null) body.durationMinutes = Number(form.durationMinutes);
+  if (form.serviceCategory != null) body.serviceCategory = form.serviceCategory;
   if (form.active != null) body.active = !!form.active;
   return body;
 }
