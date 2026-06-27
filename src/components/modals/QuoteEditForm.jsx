@@ -24,7 +24,10 @@ function SectionHeader({ eyebrow, title, action }) {
 }
 
 function QuoteEditForm({ form, setForm, touched, setTouched, creating = false, servicesCatalog = SERVICES_CATALOG }) {
-  const errors = useMemo(() => validateQuoteForm(form), [form]);
+  const errors = useMemo(
+    () => validateQuoteForm(form, servicesCatalog),
+    [form, servicesCatalog],
+  );
 
   const computedTotal = useMemo(
     () => computeBudgetTotal({

@@ -1,4 +1,4 @@
-import { computeBudgetTotal } from '../data/orcamentoCatalog'
+import { computeBudgetTotal, SERVICES_CATALOG } from '../data/orcamentoCatalog'
 import { validatePhone } from './phoneUtils'
 import {
   formatPlateInput,
@@ -17,14 +17,14 @@ export function isValidEmail(s) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s || '')
 }
 
-export function validateQuoteForm(form) {
+export function validateQuoteForm(form, servicesCatalog = SERVICES_CATALOG) {
   const selectedCount = Object.values(form.selected || {}).filter(Boolean).length
   const total = computeBudgetTotal({
     selected: form.selected,
     vehicleSize: form.vehicleSize,
     discount: form.discount,
     override: form.override ?? '',
-  })
+  }, servicesCatalog)
 
   const plateCountry = resolvePlateCountry(form.plateCountry)
   const errors = {}

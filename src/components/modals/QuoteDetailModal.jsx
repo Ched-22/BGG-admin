@@ -183,7 +183,7 @@ function QuoteDetailModal({
       total: true,
     };
     setTouched(allTouched);
-    const errors = validateQuoteForm(form);
+    const errors = validateQuoteForm(form, servicesCatalog.length ? servicesCatalog : undefined);
     if (Object.keys(errors).length > 0) {
       toast({ kind: "error", title: "Verifique os campos", desc: "Corrija os erros antes de continuar." });
       return false;
