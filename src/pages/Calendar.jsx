@@ -5,7 +5,7 @@ import { ExportMenu } from "../components/ExportMenu";
 import { CALENDAR_EXPORT_COLUMNS } from "../lib/exportColumns";
 import { ScheduleModal } from "../components/modals/TaskModals";
 import { mapTechniciansForPicker } from "../lib/technicianApi";
-import { formatDurationHours, buildMonthDays, formatISODate, todayISO, getEventSlot, getWeekGridEndHour, formatEventTimeRange, WORK_START_MIN } from "../lib/scheduling";
+import { formatDurationHours, buildMonthDays, formatISODate, todayISO, getWeekGridEndHour, formatEventTimeRange, buildWeekEventBlocks, BAIAS } from "../lib/scheduling";
 
 const PT_MONTHS = ["Janeiro","Fevereiro","Março","Abril","Maio","Junho","Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"];
 const PT_DOW_LONG = ["Domingo","Segunda","Terça","Quarta","Quinta","Sexta","Sábado"];
@@ -19,22 +19,6 @@ function serviceClass(s) {
   if (s.includes("PPF")) return "s-ppf";
   if (s.includes("Motos")) return "s-mot";
   return "";
-}
-
-/** Marcador compacto no horário agendado (sem altura proporcional à duração). */
-function buildWeekEventMarkers(dayEvents) {
-  const byStart = new Map();
-  for (const e of dayEvents) {
-    const start = getEventSlot(e).start;
-    if (!byStart.has(start)) byStart.set(start, []);
-    byStart.get(start).push(e);
-  }
-  return dayEvents.map((e) => {
-    const start = getEventSlot(e).start;
-    const siblings = byStart.get(start) || [e];
-    const laneIndex = siblings.findIndex((x) => x.id === e.id);
-    return { event: e, start, laneIndex, laneCount: siblings.length };
-  });
 }
 
 function CalendarPage({ readOnly = false, onOpenTask, events = [], tasks = [], technicians = [], onSaveSchedule, onRefresh }) {
@@ -198,7 +182,10 @@ function CalendarPage({ readOnly = false, onOpenTask, events = [], tasks = [], t
             </div>
 
             <div className="cal-legend mini-cal" style={{ marginTop: 14 }}>
-              <div style={{ fontSize: 10, letterSpacing: "0.14em", textTransform: "uppercase", color: "var(--gold)", fontWeight: 500, marginBottom: 6 }}>Legenda</div>
+              <div style={{ fontSize: 10, letterSpacing: "0.14em", textTransform: "uppercase", color: "var(--gold)", fontWeight: 500, marginBottom: 6 }}>Baias</div>
+              <div className="item"><span className="dot cal-bay-dot bay-1"></span>Baia 1 · faixa dourada</div>
+              <div className="item"><span className="dot cal-bay-dot bay-2"></span>Baia 2 · faixa azul</div>
+              <div style={{ fontSize: 10, letterSpacing: "0.14em", textTransform: "uppercase", color: "var(--gold)", fontWeight: 500, margin: "10px 0 6px" }}>Serviços</div>
               <div className="item"><span className="dot" style={{ background: "var(--gold)" }}></span>Proteção / Vitrificação</div>
               <div className="item"><span className="dot" style={{ background: "#8fbf6a" }}></span>Detalhamento Exterior</div>
               <div className="item"><span className="dot" style={{ background: "#6a9fbf" }}></span>Interior / Couro</div>
@@ -218,7 +205,7 @@ function CalendarPage({ readOnly = false, onOpenTask, events = [], tasks = [], t
               {selEvents.map(e => (
                 <div
                   key={e.id}
-                  className={`day-event-row ${serviceClass(e.servico) || "s-cer"}`}
+                  className={`day-event-row bay-${Number(e.baia) || 1} ${serviceClass(e.servico) || "s-cer"}`}
                   onClick={() => onOpenTask(e.id)}
                   style={{ cursor: "pointer" }}
                 >
@@ -265,18 +252,28 @@ function CalendarPage({ readOnly = false, onOpenTask, events = [], tasks = [], t
                           {d.getDate()}
                           {isToday ? <span className="tiny" style={{ float: "right", color: "var(--gold)", fontSize: 9, letterSpacing: "0.1em" }}>HOJE</span> : null}
                         </div>
-                        {dayEvs.slice(0, 3).map(e => (
-                          <div
-                            key={e.id}
-                            className={`ev ${serviceClass(e.servico) || "s-cer"}`}
-                            onClick={(ev) => { ev.stopPropagation(); onOpenTask(e.id); }}
-                            title={`${e.horario} · Baia ${e.baia ?? 1} · ${e.title}`}
-                          >
-                            <span className="time">{e.horario}</span>
-                            B{e.baia ?? 1} · {e.title}
-                          </div>
-                        ))}
-                        {dayEvs.length > 3 ? <div className="more">+{dayEvs.length - 3} mais</div> : null}
+                        <div className="cal-day-bays">
+                          {BAIAS.map((bay) => {
+                            const bayEvs = dayEvs.filter((e) => (Number(e.baia) || 1) === bay);
+                            return (
+                              <div key={bay} className={`cal-day-bay bay-${bay}`}>
+                                {bayEvs.slice(0, 2).map((e) => (
+                                  <div
+                                    key={e.id}
+                                    className={`ev bay-${bay} ${serviceClass(e.servico) || "s-cer"}`}
+                                    onClick={(ev) => { ev.stopPropagation(); onOpenTask(e.id); }}
+                                    title={`${formatEventTimeRange({ ...e, data: e.data })} · Baia ${bay} · ${e.title}`}
+                                  >
+                                    <span className="time">{formatEventTimeRange({ ...e, data: e.data })}</span>
+                                    {e.title}
+                                  </div>
+                                ))}
+                                {bayEvs.length > 2 ? <div className="more">+{bayEvs.length - 2}</div> : null}
+                              </div>
+                            );
+                          })}
+                        </div>
+                        {dayEvs.length > 4 ? <div className="more">+{dayEvs.length - 4} mais</div> : null}
                       </div>
                     );
                   })}
@@ -303,6 +300,10 @@ function CalendarPage({ readOnly = false, onOpenTask, events = [], tasks = [], t
                       >
                         <span>{PT_DOW_SHORT[d.getDay()]}</span>
                         <span className="day-num">{d.getDate()}</span>
+                        <span className="cal-week-bay-labels" aria-hidden="true">
+                          <span className="bay-1">B1</span>
+                          <span className="bay-2">B2</span>
+                        </span>
                       </button>
                     );
                   })}
@@ -339,30 +340,18 @@ function CalendarPage({ readOnly = false, onOpenTask, events = [], tasks = [], t
                         className="cal-week-day-events"
                         style={{ gridColumn: di + 2, gridRow: `2 / span ${hourCount}` }}
                       >
-                        {buildWeekEventMarkers(eventsForDay(iso)).map(({ event: e, start, laneIndex, laneCount }) => {
-                          const topPct = ((start - WORK_START_MIN) / weekGridMinutes) * 100;
-                          const laneWidthPct = 100 / laneCount;
-                          const markerStyle = {
-                            top: `${topPct}%`,
-                            ...(laneCount > 1 ? {
-                              left: `calc(4px + ${laneIndex * laneWidthPct}%)`,
-                              right: "auto",
-                              width: `calc(${laneWidthPct}% - 6px)`,
-                            } : {}),
-                          };
-                          return (
-                            <div
-                              key={e.id}
-                              className={`ev cal-week-marker ${serviceClass(e.servico) || "s-cer"}`}
-                              style={markerStyle}
-                              onClick={(ev) => { ev.stopPropagation(); onOpenTask(e.id); }}
-                              title={`${formatEventTimeRange({ ...e, data: e.data })} · Baia ${e.baia ?? 1} · ${e.title}`}
-                            >
-                              <span className="time">{e.horario}</span>
-                              B{e.baia ?? 1} · {e.title}
-                            </div>
-                          );
-                        })}
+                        {buildWeekEventBlocks(eventsForDay(iso), weekGridMinutes).map(({ event: e, style }) => (
+                          <div
+                            key={e.id}
+                            className={`ev cal-week-block bay-${Number(e.baia) || 1} ${serviceClass(e.servico) || "s-cer"}`}
+                            style={style}
+                            onClick={(ev) => { ev.stopPropagation(); onOpenTask(e.id); }}
+                            title={`${formatEventTimeRange({ ...e, data: e.data })} · Baia ${e.baia ?? 1} · ${e.title}`}
+                          >
+                            <span className="time">{formatEventTimeRange({ ...e, data: e.data })}</span>
+                            <span className="ev-title">B{e.baia ?? 1} · {e.title}</span>
+                          </div>
+                        ))}
                       </div>
                     );
                   })}

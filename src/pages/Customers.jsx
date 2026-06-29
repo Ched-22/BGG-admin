@@ -29,6 +29,7 @@ import {
 } from "../lib/whatsapp";
 import { PhoneInput } from "../components/PhoneInput";
 import { ClientLanguageSelect } from "../components/ClientLanguageSelect";
+import { AddressLocationFields } from "../components/AddressLocationFields";
 import { DEFAULT_PHONE_COUNTRY_CODE } from "../lib/phoneCountries";
 import { validatePhone } from "../lib/phoneUtils";
 import { resolveClientPreferredLanguage } from "../lib/clientLanguage";
@@ -225,28 +226,15 @@ function CustomerFormFields({ form, setForm }) {
           onChange={(e) => setForm((f) => ({ ...f, logradouro: e.target.value }))}
         />
       </Field>
-      <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr 1fr", gap: 12 }}>
-        <Field label="Cidade">
-          <Input
-            placeholder="São Paulo"
-            value={form.cidade}
-            onChange={(e) => setForm((f) => ({ ...f, cidade: e.target.value }))}
-          />
-        </Field>
-        <Field label="Estado">
-          <Select value={form.estado} onChange={(e) => setForm((f) => ({ ...f, estado: e.target.value }))}>
-            <option value="">UF</option>
-            {BGG_DATA.estados.map((s) => <option key={s} value={s}>{s}</option>)}
-          </Select>
-        </Field>
-        <Field label="CEP">
-          <Input
-            placeholder="00000-000"
-            value={form.cep}
-            onChange={(e) => setForm((f) => ({ ...f, cep: e.target.value }))}
-          />
-        </Field>
-      </div>
+      <AddressLocationFields
+        phoneCountryCode={form.phoneCountryCode}
+        cidade={form.cidade}
+        estado={form.estado}
+        cep={form.cep}
+        onCidadeChange={(value) => setForm((f) => ({ ...f, cidade: value }))}
+        onEstadoChange={(value) => setForm((f) => ({ ...f, estado: value }))}
+        onCepChange={(value) => setForm((f) => ({ ...f, cep: value }))}
+      />
       <Field label="Anotações" optional>
         <Textarea
           placeholder="Preferências, veículos cadastrados, observações…"
@@ -826,15 +814,15 @@ function CustomersPage({ readOnly = false, onOpenTask, onCreateTask, initialCust
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12 }}>
               <div className="kpi" style={{ padding: 14 }}>
                 <span className="label" style={{ fontSize: 9, letterSpacing: "0.16em", textTransform: "uppercase", color: "var(--fg-5)" }}>Tarefas totais</span>
-                <div className="serif" style={{ color: "var(--gold)", fontSize: 28, fontWeight: 500 }}>{detail.tarefas}</div>
+                <div className="num-display" style={{ color: "var(--gold)", fontSize: 28, fontWeight: 500 }}>{detail.tarefas}</div>
               </div>
               <div className="kpi" style={{ padding: 14 }}>
                 <span className="label" style={{ fontSize: 9, letterSpacing: "0.16em", textTransform: "uppercase", color: "var(--fg-5)" }}>Ativas</span>
-                <div className="serif" style={{ color: detail.ativas > 0 ? "var(--gold)" : "var(--fg-5)", fontSize: 28, fontWeight: 500 }}>{detail.ativas}</div>
+                <div className="num-display" style={{ color: detail.ativas > 0 ? "var(--gold)" : "var(--fg-5)", fontSize: 28, fontWeight: 500 }}>{detail.ativas}</div>
               </div>
               <div className="kpi" style={{ padding: 14 }}>
                 <span className="label" style={{ fontSize: 9, letterSpacing: "0.16em", textTransform: "uppercase", color: "var(--fg-5)" }}>LTV</span>
-                <div className="serif" style={{ color: "var(--gold)", fontSize: 22, fontWeight: 500 }}>{formatEUR(detail.totalGasto)}</div>
+                <div className="num-display" style={{ color: "var(--gold)", fontSize: 22, fontWeight: 500 }}>{formatEUR(detail.totalGasto)}</div>
               </div>
             </div>
 

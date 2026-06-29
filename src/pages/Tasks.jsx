@@ -647,7 +647,7 @@ function TaskDetail({
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 }}>
                 <div>
                   <div className="k" style={{ fontSize: 10, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--fg-5)", marginBottom: 4 }}>Valor do Orçamento</div>
-                  <div className="serif" style={{ color: "var(--gold)", fontSize: 26, fontWeight: 500 }}>{formatEUR(task.orcamento.valor)}</div>
+                  <div className="num-display" style={{ color: "var(--gold)", fontSize: 26, fontWeight: 500 }}>{formatEUR(task.orcamento.valor)}</div>
                 </div>
                 <div>
                   <div className="k" style={{ fontSize: 10, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--fg-5)", marginBottom: 4 }}>Status</div>

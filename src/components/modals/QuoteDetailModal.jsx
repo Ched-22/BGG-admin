@@ -43,7 +43,7 @@ function QuoteDetailView({ detail }) {
         </div>
         <div style={{ textAlign: "right" }}>
           <div style={{ fontSize: 10, letterSpacing: "0.16em", textTransform: "uppercase", color: "var(--fg-5)" }}>Valor total</div>
-          <div className="serif" style={{ color: "var(--gold)", fontSize: 32, fontWeight: 500, lineHeight: 1 }}>{formatEUR(detail.valor)}</div>
+          <div className="num-display" style={{ color: "var(--gold)", fontSize: 32, fontWeight: 500, lineHeight: 1 }}>{formatEUR(detail.valor)}</div>
           <div className="tiny" style={{ marginTop: 6, color: hasDiscount ? "#8fbf6a" : "var(--fg-5)" }}>
             {hasDiscount ? `Desconto aplicado: −${formatEUR(discount)}` : "Sem desconto aplicado"}
           </div>

@@ -42,6 +42,18 @@ export function minutesToTime(mins) {
   return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
 }
 
+/** Normaliza horário para HH:MM (24h) ou null se inválido. */
+export function normalizeTime24(value) {
+  const raw = String(value || "").trim();
+  if (!raw) return null;
+  const match = raw.match(/^(\d{1,2}):(\d{2})$/);
+  if (!match) return null;
+  const hours = Number(match[1]);
+  const minutes = Number(match[2]);
+  if (hours > 23 || minutes > 59) return null;
+  return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
+}
+
 export function getDurationMinutes(item) {
   if (item.duracaoHoras != null && item.duracaoHoras > 0) {
     return Math.round(Number(item.duracaoHoras) * 60);
@@ -235,6 +247,40 @@ export function getWeekGridEndHour(events, isoDates, minHour = WORK_END_MIN / 60
     if (endHour > maxHour) maxHour = endHour;
   }
   return maxHour;
+}
+
+/** Posiciona eventos na grade semanal: altura proporcional à duração, coluna fixa por baia. */
+export function buildWeekEventBlocks(dayEvents, weekGridMinutes, bays = BAIAS) {
+  const gridStart = WORK_START_MIN;
+  const gridEnd = gridStart + weekGridMinutes;
+  const laneCount = bays.length;
+
+  return dayEvents
+    .map((event) => {
+      const slot = getEventSlot(event);
+      const baia = Number(event.baia) || 1;
+      const laneIndex = Math.max(0, Math.min(baia - 1, laneCount - 1));
+      const laneWidthPct = 100 / laneCount;
+
+      const visibleStart = Math.max(slot.start, gridStart);
+      const visibleEnd = Math.min(slot.end, gridEnd);
+      if (visibleEnd <= visibleStart) return null;
+
+      const topPct = ((visibleStart - gridStart) / weekGridMinutes) * 100;
+      const heightPct = ((visibleEnd - visibleStart) / weekGridMinutes) * 100;
+
+      return {
+        event,
+        baia,
+        style: {
+          top: `${topPct}%`,
+          height: `${heightPct}%`,
+          left: `calc(2px + ${laneIndex * laneWidthPct}%)`,
+          width: `calc(${laneWidthPct}% - 4px)`,
+        },
+      };
+    })
+    .filter(Boolean);
 }
 
 export function formatISODate(d) {

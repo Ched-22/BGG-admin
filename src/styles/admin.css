@@ -866,8 +866,47 @@ a { color: var(--gold); text-decoration: none; }
 .muted { color: var(--fg-5); }
 .small { font-size: 12px; }
 .tiny { font-size: 11px; }
-.mono { font-variant-numeric: tabular-nums; letter-spacing: 0.02em; }
 .serif { font-family: var(--font-display); }
+.num-display,
+.mono,
+.mono.serif,
+.serif.mono,
+.tbl .id,
+.tbl .amount,
+.stat .num,
+.entity-card .stats .v,
+.service-price-value,
+.q-stage .stage-count,
+.cal-day .num,
+.day-event-row .time,
+.phone-input__country,
+.phone-input__number,
+input[type="number"],
+input[type="date"],
+input[type="time"],
+input[inputmode="numeric"] {
+  font-family: var(--font-numeric);
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1, "lnum" 1;
+  letter-spacing: 0.01em;
+}
+.mono,
+.mono.serif,
+.serif.mono,
+.tbl .id,
+.day-event-row .time,
+.phone-input__country,
+.phone-input__number {
+  font-weight: 500;
+}
+.num-display,
+.tbl .amount,
+.stat .num,
+.entity-card .stats .v,
+.service-price-value,
+.q-stage .stage-count {
+  font-weight: 600;
+}
 .gold { color: var(--gold); }
 .uppercase { text-transform: uppercase; letter-spacing: 0.1em; }
 .divider { height: 1px; background: var(--border); }
@@ -903,13 +942,14 @@ a { color: var(--gold); text-decoration: none; }
   font-weight: 500;
 }
 .stat .num {
-  font-family: var(--font-display);
+  font-family: var(--font-numeric);
   color: var(--gold);
   font-size: 38px;
-  letter-spacing: 0.02em;
+  letter-spacing: 0.01em;
   line-height: 1;
-  font-weight: 500;
+  font-weight: 600;
   font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1, "lnum" 1;
 }
 .stat .num.danger { color: var(--destructive); }
 .stat .num.warn { color: #d4a017; }
@@ -1415,6 +1455,8 @@ button:focus-visible {
 }
 .cal-legend .item { display: flex; align-items: center; gap: 8px; font-size: 11px; color: var(--fg-4); }
 .cal-legend .dot { width: 9px; height: 9px; border-radius: 2px; }
+.cal-legend .cal-bay-dot.bay-1 { background: var(--cal-bay-1-ev-border); }
+.cal-legend .cal-bay-dot.bay-2 { background: var(--cal-bay-2-ev-border); }
 
 .cal-controls {
   display: flex; gap: 10px; align-items: center;
@@ -1531,6 +1573,24 @@ button:focus-visible {
   color: var(--fg);
   line-height: 1;
 }
+.cal-week-bay-labels {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  width: 100%;
+  margin-top: 4px;
+  gap: 0;
+  font-size: 8px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--fg-6);
+  font-weight: 500;
+}
+.cal-week-bay-labels span {
+  text-align: center;
+}
+.cal-week-bay-labels span:first-child {
+  border-right: 1px solid var(--border);
+}
 .cal-week-grid > .cell.head.today,
 .cal-week-grid > .cell.slot.today {
   background: rgba(194, 164, 109, 0.06);
@@ -1646,6 +1706,38 @@ button:focus-visible {
 
 .cal-day .more { font-size: 10px; color: var(--fg-6); padding: 0 4px; }
 
+.cal-day-bays {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0;
+  flex: 1;
+  min-height: 0;
+  border-top: 1px solid var(--border);
+  margin-top: 2px;
+}
+.cal-day-bay {
+  min-width: 0;
+  padding: 2px 1px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  overflow: hidden;
+}
+.cal-day-bay + .cal-day-bay {
+  border-left: 1px solid var(--border);
+}
+.cal-day-bay .ev {
+  white-space: normal;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  line-height: 1.25;
+}
+.cal-day-bay .more {
+  font-size: 9px;
+  padding: 0 2px;
+}
+
 /* Week view — coluna de horários + 7 dias (mesma grade do mês) */
 .cal-week-grid {
   display: grid;
@@ -1679,21 +1771,60 @@ button:focus-visible {
   min-height: 0;
   min-width: 0;
 }
+.cal-week-day-events::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: var(--border);
+  pointer-events: none;
+  z-index: 0;
+}
 
 .cal-week-day-events .ev {
   position: absolute;
-  left: 4px;
-  right: 4px;
   cursor: pointer;
   z-index: 1;
   pointer-events: auto;
+  box-sizing: border-box;
 }
 
-/* Semana: pill no horário marcado (igual ao mês), sem altura pela duração */
-.cal-week-day-events .ev.cal-week-marker {
-  height: auto;
-  min-height: 22px;
-  max-height: 26px;
+/* Faixa superior = baia · fundo/borda esquerda = tipo de serviço */
+.cal-day .ev.bay-1,
+.cal-week .ev.bay-1,
+.day-event-row.bay-1 {
+  box-shadow: inset 0 var(--cal-bay-stripe-width) 0 var(--cal-bay-1-ev-border);
+}
+.cal-day .ev.bay-2,
+.cal-week .ev.bay-2,
+.day-event-row.bay-2 {
+  box-shadow: inset 0 var(--cal-bay-stripe-width) 0 var(--cal-bay-2-ev-border);
+}
+
+/* Semana: bloco proporcional à duração do serviço, coluna fixa por baia */
+.cal-week-day-events .ev.cal-week-block {
+  min-height: 28px;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  gap: 2px;
+  padding: 4px 5px;
+  overflow: hidden;
+  white-space: normal;
+}
+.cal-week-day-events .ev.cal-week-block .time {
+  flex-shrink: 0;
+  display: block;
+}
+.cal-week-day-events .ev.cal-week-block .ev-title {
+  font-size: 9.5px;
+  line-height: 1.25;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
 }
 
 /* Side panel for day events */
@@ -1848,11 +1979,12 @@ button:focus-visible {
 }
 .entity-card .stats .k { font-size: 9px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--fg-6); }
 .entity-card .stats .v {
-  font-family: var(--font-display);
+  font-family: var(--font-numeric);
   color: var(--gold);
   font-size: 20px;
-  font-weight: 500;
+  font-weight: 600;
   font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1, "lnum" 1;
   margin-top: 2px;
 }
 .entity-card .skills {
@@ -2175,12 +2307,13 @@ button:focus-visible {
   font-weight: 500;
 }
 .q-stage .stage-count {
-  font-family: var(--font-display);
+  font-family: var(--font-numeric);
   color: var(--gold);
   font-size: 32px;
   font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1, "lnum" 1;
   line-height: 1;
-  font-weight: 500;
+  font-weight: 600;
 }
 .q-stage .stage-value {
   margin-top: 6px;
@@ -2662,11 +2795,12 @@ button:focus-visible {
   color: var(--fg-6);
 }
 .service-price-value {
-  font-family: var(--font-display);
+  font-family: var(--font-numeric);
   font-size: 14px;
-  font-weight: 500;
+  font-weight: 600;
   color: var(--fg);
   font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1, "lnum" 1;
 }
 
 .service-card-actions {

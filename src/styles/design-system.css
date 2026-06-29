@@ -59,6 +59,15 @@
   --grid-line: rgba(194, 164, 109, 0.04);
   --gold-glow-1: rgba(194, 164, 109, 0.18);
   --gold-glow-2: rgba(194, 164, 109, 0.08);
+
+  /* Calendar — cor apenas nos blocos de serviço por baia */
+  --cal-bay-1-ev-bg: rgba(194, 164, 109, 0.28);
+  --cal-bay-1-ev-border: #C2A46D;
+  --cal-bay-1-ev-time: #c2a46d;
+  --cal-bay-2-ev-bg: rgba(106, 159, 191, 0.28);
+  --cal-bay-2-ev-border: #6a9fbf;
+  --cal-bay-2-ev-time: #4a87ad;
+  --cal-bay-stripe-width: 3px;
 }
 
 [data-theme="light"] {
@@ -111,6 +120,14 @@
   --grid-line: rgba(154, 125, 69, 0.08);
   --gold-glow-1: rgba(154, 125, 69, 0.22);
   --gold-glow-2: rgba(154, 125, 69, 0.10);
+
+  --cal-bay-1-ev-bg: rgba(154, 125, 69, 0.22);
+  --cal-bay-1-ev-border: #9A7D45;
+  --cal-bay-1-ev-time: #9a7d45;
+  --cal-bay-2-ev-bg: rgba(106, 159, 191, 0.22);
+  --cal-bay-2-ev-border: #6a9fbf;
+  --cal-bay-2-ev-time: #4a87ad;
+  --cal-bay-stripe-width: 3px;
 }
 
 :root {
@@ -118,6 +135,7 @@
   /* ---------- Typography ---------- */
   --font-display: "Cormorant Garamond", Georgia, "Times New Roman", serif;
   --font-body:    "Montserrat", ui-sans-serif, system-ui, sans-serif;
+  --font-numeric: "Montserrat", ui-sans-serif, system-ui, sans-serif;
 
   --weight-light:  300;
   --weight-normal: 400;

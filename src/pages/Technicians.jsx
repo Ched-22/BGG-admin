@@ -812,15 +812,15 @@ function TechniciansPage({ readOnly = false, tasks = [], onOpenTask }) {
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 }}>
               <div className="kpi" style={{ padding: 12 }}>
                 <span className="label" style={{ fontSize: 9, letterSpacing: "0.16em", textTransform: "uppercase", color: "var(--fg-5)" }}>Ativas</span>
-                <div className="serif" style={{ color: "var(--gold)", fontSize: 24, fontWeight: 500 }}>{detail.ativas}</div>
+                <div className="num-display" style={{ color: "var(--gold)", fontSize: 24, fontWeight: 500 }}>{detail.ativas}</div>
               </div>
               <div className="kpi" style={{ padding: 12 }}>
                 <span className="label" style={{ fontSize: 9, letterSpacing: "0.16em", textTransform: "uppercase", color: "var(--fg-5)" }}>Concluídas</span>
-                <div className="serif" style={{ color: "var(--gold)", fontSize: 24, fontWeight: 500 }}>{detail.concluidas}</div>
+                <div className="num-display" style={{ color: "var(--gold)", fontSize: 24, fontWeight: 500 }}>{detail.concluidas}</div>
               </div>
               <div className="kpi" style={{ padding: 12 }}>
                 <span className="label" style={{ fontSize: 9, letterSpacing: "0.16em", textTransform: "uppercase", color: "var(--fg-5)" }}>Carga</span>
-                <div className="serif" style={{ color: "var(--gold)", fontSize: 24, fontWeight: 500 }}>{detail.carga}/8</div>
+                <div className="num-display" style={{ color: "var(--gold)", fontSize: 24, fontWeight: 500 }}>{detail.carga}/8</div>
               </div>
             </div>
 

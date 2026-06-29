@@ -20,12 +20,23 @@ import {
   listFinanceExpenses,
   upsertEmployeeCost,
 } from "../lib/financeApi";
+import { resolveFinancePeriodBounds, summaryMatchesPreset } from "../lib/financePeriod";
 
 const PRESETS = [
   { id: "month", label: "Mês atual" },
   { id: "quarter", label: "Trimestre" },
+  { id: "semester", label: "Semestre" },
   { id: "year", label: "Ano" },
+  { id: "custom", label: "Personalizado" },
 ];
+
+function defaultCustomRange() {
+  const bounds = resolveFinancePeriodBounds("month");
+  return {
+    periodStart: bounds?.periodStart ?? "",
+    periodEnd: bounds?.periodEnd ?? "",
+  };
+}
 
 function KpiCard({ label, value, tone = "gold", hint }) {
   const color =
@@ -65,7 +76,9 @@ export function FinancePage() {
   const toast = useToast();
   const [confirm, ConfirmEl] = useConfirm();
   const [preset, setPreset] = useState("month");
+  const [customRange, setCustomRange] = useState(defaultCustomRange);
   const [summary, setSummary] = useState(null);
+  const [summaryError, setSummaryError] = useState("");
   const [expenses, setExpenses] = useState([]);
   const [employeeCosts, setEmployeeCosts] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -76,36 +89,115 @@ export function FinancePage() {
   const [editingCostId, setEditingCostId] = useState(null);
   const [costDraft, setCostDraft] = useState("");
 
-  const loadAll = useCallback(async () => {
-    const [summaryData, expenseRows, costRows] = await Promise.all([
-      fetchFinanceSummary({ preset }),
+  const loadSummary = useCallback(async (options) => {
+    if (options.periodStart && options.periodEnd) {
+      return fetchFinanceSummary({
+        periodStart: options.periodStart,
+        periodEnd: options.periodEnd,
+      });
+    }
+    return fetchFinanceSummary({ preset: options.preset ?? "month" });
+  }, []);
+
+  const summaryQuery = useMemo(() => {
+    if (preset === "custom") {
+      return {
+        preset: "custom",
+        periodStart: customRange.periodStart,
+        periodEnd: customRange.periodEnd,
+      };
+    }
+    return { preset };
+  }, [preset, customRange.periodStart, customRange.periodEnd]);
+
+  const customRangeInvalid = preset === "custom" && (
+    !customRange.periodStart
+    || !customRange.periodEnd
+    || customRange.periodStart > customRange.periodEnd
+  );
+
+  const loadLists = useCallback(async () => {
+    const [expenseRows, costRows] = await Promise.all([
       listFinanceExpenses(),
       listEmployeeCosts(),
     ]);
-    setSummary(summaryData);
     setExpenses(expenseRows);
     setEmployeeCosts(costRows);
-  }, [preset]);
+  }, []);
 
   useEffect(() => {
+    if (customRangeInvalid) {
+      setSummary(null);
+      setSummaryError(
+        customRange.periodStart && customRange.periodEnd && customRange.periodStart > customRange.periodEnd
+          ? "A data de início deve ser anterior ou igual à data de fim."
+          : "Informe a data de início e fim do período.",
+      );
+      setLoading(false);
+      return undefined;
+    }
+
     let cancelled = false;
     setLoading(true);
-    loadAll()
-      .catch(() => {
-        if (!cancelled) {
-          toast({ kind: "error", title: "Falha ao carregar financeiro", desc: "Tente novamente." });
+    setSummary(null);
+    setSummaryError("");
+
+    loadSummary(summaryQuery)
+      .then((summaryData) => {
+        if (cancelled) return;
+        if (!summaryMatchesPreset(summaryData, preset, customRange)) {
+          const expected = preset === "custom"
+            ? customRange
+            : resolveFinancePeriodBounds(preset);
+          setSummaryError(
+            expected
+              ? `A API devolveu o período ${summaryData.periodStart} — ${summaryData.periodEnd}, mas o filtro selecionado (${PRESETS.find((p) => p.id === preset)?.label}) deveria ser ${expected.periodStart} — ${expected.periodEnd}. Atualize a API em produção.`
+              : "Período inválido devolvido pela API.",
+          );
         }
+        setSummary(summaryData);
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        const msg = err.response?.data?.message;
+        const detail = Array.isArray(msg) ? msg.join(", ") : msg;
+        setSummaryError(
+          detail
+            || (err.response?.status === 400
+              ? "Período não suportado pela API. Faça deploy da versão mais recente da bgggarage-api."
+              : "Não foi possível carregar o resumo financeiro."),
+        );
+        toast({
+          kind: "error",
+          title: "Falha ao carregar financeiro",
+          desc: detail || "Tente novamente.",
+        });
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
       });
+
     return () => { cancelled = true; };
-  }, [loadAll, toast]);
+  }, [summaryQuery, preset, customRange, customRangeInvalid, loadSummary]);
+
+  useEffect(() => {
+    loadLists().catch(() => {
+      toast({ kind: "error", title: "Falha ao carregar listas", desc: "Tente novamente." });
+    });
+  }, [loadLists, toast]);
+
+  const reloadAll = useCallback(async () => {
+    const [summaryData] = await Promise.all([
+      loadSummary(summaryQuery),
+      loadLists(),
+    ]);
+    setSummary(summaryData);
+  }, [summaryQuery, loadSummary, loadLists]);
 
   const handleRefresh = async () => {
     setRefreshing(true);
     try {
-      await loadAll();
+      await reloadAll();
     } finally {
       setRefreshing(false);
     }
@@ -141,7 +233,7 @@ export function FinancePage() {
       setExpenses((cur) => [created, ...cur]);
       setShowExpenseModal(false);
       setExpenseForm(emptyExpenseForm());
-      await loadAll();
+      await reloadAll();
       toast({ kind: "success", title: "Despesa registada" });
     } catch (err) {
       const msg = err.response?.data?.message;
@@ -166,7 +258,7 @@ export function FinancePage() {
     try {
       await deleteFinanceExpense(expense.id);
       setExpenses((cur) => cur.filter((row) => row.id !== expense.id));
-      await loadAll();
+      await reloadAll();
       toast({ kind: "success", title: "Despesa removida" });
     } catch {
       toast({ kind: "error", title: "Falha ao remover despesa" });
@@ -183,15 +275,23 @@ export function FinancePage() {
       const updated = await upsertEmployeeCost(row.userId, { monthlyCost });
       setEmployeeCosts((cur) => cur.map((r) => (r.userId === updated.userId ? updated : r)));
       setEditingCostId(null);
-      await loadAll();
+      await reloadAll();
       toast({ kind: "success", title: "Custo atualizado", desc: row.userName });
     } catch {
       toast({ kind: "error", title: "Falha ao guardar custo" });
     }
   };
 
+  const periodExpenses = useMemo(() => {
+    if (!summary?.periodStart || !summary?.periodEnd) return expenses;
+    return expenses.filter(
+      (exp) => exp.occurredAt >= summary.periodStart && exp.occurredAt <= summary.periodEnd,
+    );
+  }, [expenses, summary]);
+
+  const activePresetLabel = PRESETS.find((p) => p.id === preset)?.label ?? preset;
   const periodLabel = summary
-    ? `${summary.periodStart} — ${summary.periodEnd}`
+    ? `${activePresetLabel} · ${summary.periodStart} — ${summary.periodEnd}`
     : "—";
 
   return (
@@ -204,23 +304,71 @@ export function FinancePage() {
             Período: {periodLabel} · Custo de produtos atualiza ao reduzir stock no Estoque
           </div>
         </div>
-        <div className="row" style={{ gap: 10 }}>
+        <div className="row" style={{ gap: 10, flexWrap: "wrap", alignItems: "flex-end" }}>
           <div className="select-wrap" style={{ minWidth: 160 }}>
-            <select className="select" value={preset} onChange={(e) => setPreset(e.target.value)}>
+            <select
+              className="select"
+              value={preset}
+              onChange={(e) => {
+                const next = e.target.value;
+                setPreset(next);
+                if (next === "custom" && !customRange.periodStart) {
+                  setCustomRange(defaultCustomRange());
+                }
+              }}
+            >
               {PRESETS.map((p) => (
                 <option key={p.id} value={p.id}>{p.label}</option>
               ))}
             </select>
           </div>
+          {preset === "custom" ? (
+            <>
+              <Field label="Início">
+                <Input
+                  type="date"
+                  value={customRange.periodStart}
+                  onChange={(e) => setCustomRange((cur) => ({ ...cur, periodStart: e.target.value }))}
+                />
+              </Field>
+              <Field label="Fim">
+                <Input
+                  type="date"
+                  value={customRange.periodEnd}
+                  onChange={(e) => setCustomRange((cur) => ({ ...cur, periodEnd: e.target.value }))}
+                />
+              </Field>
+            </>
+          ) : null}
           <PageRefreshButton onClick={handleRefresh} loading={refreshing}/>
           <Button icon={Icon.Plus} onClick={() => setShowExpenseModal(true)}>Nova despesa</Button>
         </div>
       </div>
 
-      {loading && !summary ? (
+      {loading ? (
         <div className="muted" style={{ padding: 40, textAlign: "center" }}>A carregar…</div>
+      ) : customRangeInvalid ? (
+        <div style={{ padding: 24, border: "1px solid var(--destructive)", borderRadius: 4, color: "var(--fg-3)" }}>
+          {summaryError || "Informe a data de início e fim do período."}
+        </div>
+      ) : summaryError && !summary ? (
+        <div style={{ padding: 24, border: "1px solid var(--destructive)", borderRadius: 4, color: "var(--fg-3)" }}>
+          {summaryError}
+        </div>
       ) : summary ? (
         <>
+          {summaryError ? (
+            <div style={{
+              marginBottom: 16,
+              padding: 14,
+              border: "1px solid var(--destructive)",
+              borderRadius: 4,
+              color: "var(--fg-3)",
+              fontSize: 13,
+            }}>
+              {summaryError}
+            </div>
+          ) : null}
           <div className="dash-grid" style={{ marginBottom: 22 }}>
             <div className="col-3"><KpiCard label="Receita total" value={formatEUR(summary.totalRevenue)} hint={`${summary.completedServicesCount} serviços concluídos`} /></div>
             <div className="col-3"><KpiCard label="Receita média" value={formatEUR(summary.averageRevenue)} hint="Por serviço concluído" /></div>
@@ -258,6 +406,7 @@ export function FinancePage() {
           <div className="card" style={{ marginBottom: 22 }}>
             <div className="card-head">
               <h3><Icon.FileText size={18}/> Despesas registadas</h3>
+              <span className="muted small">No período selecionado</span>
             </div>
             <div className="card-body" style={{ padding: 0 }}>
               <table className="tbl">
@@ -271,7 +420,7 @@ export function FinancePage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {expenses.map((exp) => (
+                  {periodExpenses.map((exp) => (
                     <tr key={exp.id}>
                       <td className="mono muted small">{exp.occurredAt}</td>
                       <td>{exp.label}</td>
@@ -284,8 +433,8 @@ export function FinancePage() {
                   ))}
                 </tbody>
               </table>
-              {expenses.length === 0 ? (
-                <div style={{ padding: 24, textAlign: "center", color: "var(--fg-5)" }}>Nenhuma despesa registada.</div>
+              {periodExpenses.length === 0 ? (
+                <div style={{ padding: 24, textAlign: "center", color: "var(--fg-5)" }}>Nenhuma despesa neste período.</div>
               ) : null}
             </div>
           </div>

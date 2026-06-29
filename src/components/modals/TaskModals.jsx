@@ -1,25 +1,22 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { BGG_DATA } from "../../data/bggData";
 import { Button, Icon, Field, Input, Select, Textarea, Checkbox, Modal, useToast, formatEUR } from "../ui";
+import { AddressLocationFields } from "../AddressLocationFields";
+import { TimeInput24 } from "../TimeInput24";
 import { mapClientToTaskPrefill, searchClients } from "../../lib/clientApi";
 import {
   BAIAS,
   DURATION_HOUR_OPTIONS,
   DURATION_OTHER,
-  findBayConflict,
-  findTechnicianConflict,
   formatDurationHours,
   buildMonthDays,
   formatISODate,
   todayISO,
-  getBlockedTimeSlots,
-  endsAfterClosing,
   isPresetDurationHours,
   isLongDurationHours,
-  minutesToTime,
-  parseTimeToMinutes,
   resolveDurationHours,
   SCHEDULE_TIME_SLOTS,
+  normalizeTime24,
   filterTechniciansForScheduleDate,
   isServiceDateAvailableForTechnician,
   countEligibleTechniciansOnDate,
@@ -275,7 +272,7 @@ function ScheduleModal({ open, task, tasks = EMPTY_TASKS, events = [], defaultDa
     const initialDropoffDate = source?.clientDropoffDate || source?.dataAgendada || defaultDate || todayISO();
     if (source) {
       setDropoffDate(initialDropoffDate);
-      setDropoffTime(source.clientDropoffTime || source.horario || "");
+      setDropoffTime(normalizeTime24(source.clientDropoffTime || source.horario || "") || source.clientDropoffTime || source.horario || "");
       setDate(initialServiceDate);
       setTime(source.horario || "");
       setTech(source.tecnico || "");
@@ -347,19 +344,6 @@ function ScheduleModal({ open, task, tasks = EMPTY_TASKS, events = [], defaultDa
     ) > 0;
   }, [tech, effectiveDuracaoHoras, baia, events, scheduleSlotContext, times, techOptions, activeTask]);
 
-  const longDuration = isLongDurationHours(effectiveDuracaoHoras);
-  const canEvaluateSlots = activeTaskId && date && effectiveDuracaoHoras > 0 && (!longDuration || tech);
-  const blockedTimes = useMemo(
-    () => (canEvaluateSlots
-      ? getBlockedTimeSlots(
-        events,
-        { data: date, duracaoHoras: effectiveDuracaoHoras, baia, tecnico: tech, excludeId: activeTaskId },
-        times,
-      )
-      : (longDuration ? times : [])),
-    [events, date, effectiveDuracaoHoras, baia, tech, activeTaskId, longDuration, canEvaluateSlots, times],
-  );
-
   const techPickerOptions = date ? availableTechOptions : eligibleTechOptions;
 
   useEffect(() => {
@@ -381,19 +365,6 @@ function ScheduleModal({ open, task, tasks = EMPTY_TASKS, events = [], defaultDa
       setTime("");
     }
   }, [open, tech, events, scheduleSlotContext, times, date]);
-
-  useEffect(() => {
-    if (!open || !date || !time) return;
-    if (blockedTimes.includes(time)) setTime("");
-  }, [open, date, tech, baia, effectiveDuracaoHoras, blockedTimes, time]);
-  const conflictAtSelection = activeTaskId && date && time && baia && effectiveDuracaoHoras > 0
-    ? findBayConflict(events, { data: date, horario: time, duracaoHoras: effectiveDuracaoHoras, baia }, activeTaskId)
-      || (tech ? findTechnicianConflict(
-        events,
-        { data: date, horario: time, duracaoHoras: effectiveDuracaoHoras, baia, tecnico: tech },
-        activeTaskId,
-      ) : null)
-    : null;
 
   const clientPhone = activeTask ? {
     countryCode: activeTask.clienteTelCountryCode,
@@ -427,6 +398,7 @@ function ScheduleModal({ open, task, tasks = EMPTY_TASKS, events = [], defaultDa
     if (!activeTask) next.task = "Selecione a tarefa a agendar.";
     if (!dropoffDate) next.dropoffDate = "A data de entrega é obrigatória.";
     if (!dropoffTime) next.dropoffTime = "O horário de entrega é obrigatório.";
+    else if (!normalizeTime24(dropoffTime)) next.dropoffTime = "Use o formato 24 horas (ex: 20:00).";
     if (!date) next.date = "A data do serviço é obrigatória.";
     if (!time) next.time = "Horário do serviço é obrigatório.";
     if (!tech) next.tech = "Técnico é obrigatório.";
@@ -443,35 +415,13 @@ function ScheduleModal({ open, task, tasks = EMPTY_TASKS, events = [], defaultDa
     } else if (!effectiveDuracaoHoras || effectiveDuracaoHoras <= 0) {
       next.duracaoHoras = "Informe a duração do serviço.";
     }
-    if (!isLongDurationHours(effectiveDuracaoHoras) && effectiveDuracaoHoras > 0 && endsAfterClosing(time, effectiveDuracaoHoras)) {
-      next.time = `O serviço termina após o fechamento (${minutesToTime(parseTimeToMinutes(time) + effectiveDuracaoHoras * 60)}).`;
-    }
-    if (activeTask && effectiveDuracaoHoras > 0) {
-      const bayConflict = findBayConflict(
-        events,
-        { data: date, horario: time, duracaoHoras: effectiveDuracaoHoras, baia },
-        activeTask.id,
-      );
-      const techConflict = tech
-        ? findTechnicianConflict(
-          events,
-          { data: date, horario: time, duracaoHoras: effectiveDuracaoHoras, baia, tecnico: tech },
-          activeTask.id,
-        )
-        : null;
-      if (bayConflict) {
-        next.time = `Baia ${baia} ocupada neste horário — conflito com ${bayConflict.title || bayConflict.id}.`;
-      } else if (techConflict) {
-        next.time = `Técnico indisponível nesta janela — conflito com ${techConflict.title || techConflict.id}.`;
-      }
-    }
     if (notes.length > 500) next.notes = "As anotações da agenda não devem exceder 500 caracteres.";
     setErr(next);
     if (Object.keys(next).length) return;
     try {
       await onSave(activeTask.id, {
         clientDropoffDate: dropoffDate,
-        clientDropoffTime: dropoffTime,
+        clientDropoffTime: normalizeTime24(dropoffTime),
         dataAgendada: date,
         horario: time,
         tecnico: tech,
@@ -539,11 +489,10 @@ function ScheduleModal({ open, task, tasks = EMPTY_TASKS, events = [], defaultDa
                   err={!!err.dropoffDate}
                 />
               </Field>
-              <Field label="Hora de entrega" error={err.dropoffTime} hint="Horário comunicado ao cliente (WhatsApp)">
-                <Input
-                  type="time"
+              <Field label="Hora de entrega" error={err.dropoffTime} hint="Formato 24 horas (ex: 20:00) · horário comunicado ao cliente (WhatsApp)">
+                <TimeInput24
                   value={dropoffTime}
-                  onChange={(e) => setDropoffTime(e.target.value)}
+                  onChange={setDropoffTime}
                   err={!!err.dropoffTime}
                 />
               </Field>
@@ -694,30 +643,18 @@ function ScheduleModal({ open, task, tasks = EMPTY_TASKS, events = [], defaultDa
           <Field
             label="Horário do serviço"
             error={err.time}
-            hint={longDuration && (!tech || !date)
-              ? "Selecione técnico e data do serviço para ver horários disponíveis"
-              : conflictAtSelection
-                ? (findTechnicianConflict(
-                  events,
-                  { data: date, horario: time, duracaoHoras: effectiveDuracaoHoras, baia, tecnico: tech },
-                  activeTaskId,
-                )
-                  ? `Técnico indisponível — conflito com ${conflictAtSelection.title || conflictAtSelection.id}`
-                  : `Baia ${baia} indisponível — conflito com ${conflictAtSelection.title || conflictAtSelection.id}`)
-                : (longDuration
-                  ? "Horários em cinza: técnico ou baia indisponível nesta janela"
-                  : "Horários em cinza: baia ocupada ou ultrapassam 18:00")}
+            hint="Selecione o horário de início — todos os horários estão disponíveis"
           >
             <div className="time-grid">
-              {times.map(t => (
+              {times.map((t) => (
                 <button
                   key={t}
                   type="button"
                   className={`time-chip ${time === t ? "sel" : ""}`}
-                  disabled={blockedTimes.includes(t) || (longDuration && (!tech || !date))}
                   onClick={() => setTime(t)}
-                  title={blockedTimes.includes(t) ? "Indisponível nesta janela" : undefined}
-                >{t}</button>
+                >
+                  {t}
+                </button>
               ))}
             </div>
           </Field>
@@ -1301,20 +1238,19 @@ function CreateTaskModal({ open, onClose, onCreate, prefill }) {
           <Field label="Unidade / Apartamento / Sala" optional={skipAddressValidation} error={err.unidade}>
             <Input value={data.unidade} onChange={(e) => set("unidade", e.target.value)} placeholder="Ex: Apto 1402, Torre B" err={!!err.unidade}/>
           </Field>
-          <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr 1fr", gap: 12 }}>
-            <Field label="Cidade" optional={skipAddressValidation} error={err.cidade}>
-              <Input value={data.cidade} onChange={(e) => set("cidade", e.target.value)} err={!!err.cidade}/>
-            </Field>
-            <Field label="Estado" optional={skipAddressValidation} error={err.estado}>
-              <Select value={data.estado} onChange={(e) => set("estado", e.target.value)} err={!!err.estado}>
-                <option value="">UF</option>
-                {BGG_DATA.estados.map(s => <option key={s} value={s}>{s}</option>)}
-              </Select>
-            </Field>
-            <Field label="CEP" optional={skipAddressValidation} error={err.cep}>
-              <Input value={data.cep} onChange={(e) => set("cep", e.target.value)} placeholder="00000-000" err={!!err.cep}/>
-            </Field>
-          </div>
+          <AddressLocationFields
+            phoneCountryCode={data.clienteTelCountryCode}
+            cidade={data.cidade}
+            estado={data.estado}
+            cep={data.cep}
+            optional={skipAddressValidation}
+            cidadeError={err.cidade}
+            estadoError={err.estado}
+            cepError={err.cep}
+            onCidadeChange={(value) => set("cidade", value)}
+            onEstadoChange={(value) => set("estado", value)}
+            onCepChange={(value) => set("cep", value)}
+          />
           <Field label="Anotações da Propriedade" optional hint="Ex: ponto de água, restrições de horário, vaga de garagem.">
             <Textarea value={data.anotPropriedade} onChange={(e) => set("anotPropriedade", e.target.value)} maxLength={1000}/>
           </Field>
@@ -1516,7 +1452,7 @@ function TaskOrcamentoModal({ open, task, onClose, onSave }) {
         <div style={{ background: "var(--bg-elevated)", border: "1px solid var(--gold-30)", borderRadius: 4, padding: 14 }}>
           <div className="row" style={{ justifyContent: "space-between" }}>
             <span className="tiny muted" style={{ letterSpacing: "0.1em", textTransform: "uppercase" }}>Total</span>
-            <span className="serif mono" style={{ color: "var(--gold)", fontSize: 22, fontWeight: 500 }}>
+            <span className="num-display" style={{ color: "var(--gold)", fontSize: 22, fontWeight: 500 }}>
               {formatEUR(Number(form.valor) || 0)}
             </span>
           </div>

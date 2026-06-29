@@ -7,8 +7,14 @@ export const EXPENSE_CATEGORIES = [
   { id: 'other', label: 'Outra' },
 ];
 
-export async function fetchFinanceSummary(params = { preset: 'month' }) {
-  const { data } = await api.get('/finance/summary', { params });
+export async function fetchFinanceSummary({ preset = 'month', periodStart, periodEnd } = {}) {
+  const params = periodStart && periodEnd
+    ? { periodStart, periodEnd }
+    : { preset };
+  const { data } = await api.get('/finance/summary', {
+    params,
+    headers: { 'Cache-Control': 'no-cache' },
+  });
   return data;
 }
 
