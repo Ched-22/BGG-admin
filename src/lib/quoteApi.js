@@ -143,6 +143,57 @@ export function quoteSortDate(quote) {
   return iso ? new Date(iso).getTime() : 0
 }
 
+export const UNSCHEDULED_QUOTE_DASHBOARD_HOURS = 72
+
+export function quoteReferenceTimestamp(quote) {
+  const raw = quote?._raw || {}
+  const iso = raw.approvedAt || raw.submittedAt || raw.createdAt
+  return iso ? new Date(iso).getTime() : 0
+}
+
+export function isQuoteApproved(quote) {
+  if (!quote) return false
+  const apiStatus = quote.statusApi || quote.status
+  return apiStatus === 'APPROVED' || quote.status === 'Aprovado'
+}
+
+export function isQuoteScheduled(quote, tasks = []) {
+  const linkedId = quote?.linkedTaskDisplayId
+  if (!linkedId) return false
+  const task = tasks.find((t) => t.id === linkedId)
+  return !!(task?.dataAgendada)
+}
+
+export function isQuoteUnscheduled(quote, tasks = []) {
+  return isQuoteApproved(quote) && !isQuoteScheduled(quote, tasks)
+}
+
+export function isWithinLastHours(timestampMs, hours = UNSCHEDULED_QUOTE_DASHBOARD_HOURS) {
+  if (!timestampMs) return false
+  return Date.now() - timestampMs <= hours * 60 * 60 * 1000
+}
+
+export function filterRecentUnscheduledQuotes(quotes, tasks, hours = UNSCHEDULED_QUOTE_DASHBOARD_HOURS) {
+  return (Array.isArray(quotes) ? quotes : [])
+    .filter((quote) => (
+      isQuoteUnscheduled(quote, tasks)
+      && isWithinLastHours(quoteReferenceTimestamp(quote), hours)
+    ))
+    .sort((a, b) => quoteReferenceTimestamp(b) - quoteReferenceTimestamp(a))
+}
+
+export function formatHoursSinceQuote(quote) {
+  const ts = quoteReferenceTimestamp(quote)
+  if (!ts) return '—'
+  const hours = Math.floor((Date.now() - ts) / (60 * 60 * 1000))
+  if (hours < 1) return 'há menos de 1 h'
+  if (hours === 1) return 'há 1 h'
+  if (hours < 24) return `há ${hours} h`
+  const days = Math.floor(hours / 24)
+  if (days === 1) return 'há 1 dia'
+  return `há ${days} dias`
+}
+
 export function mapQuoteFromApi(row) {
   if (!row) return null
 

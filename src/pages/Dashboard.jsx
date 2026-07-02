@@ -3,7 +3,7 @@ import { Button, Icon, PageRefreshButton, StatusBadge, formatEUR, useConfirm, us
 import api from "../lib/api";
 import { needsRestock, stockLevelRatio, suggestedOrderQty } from "../lib/stock";
 import { StockLevelBar } from "./Stock";
-import { isQuotePending, quoteSortDate } from "../lib/quoteApi";
+import { isQuotePending, quoteSortDate, filterRecentUnscheduledQuotes, formatHoursSinceQuote } from "../lib/quoteApi";
 import { countOpenTasks, isClosedTaskStatus } from "../lib/taskApi";
 import { formatISODate, todayISO } from "../lib/scheduling";
 import { buildDashboardAlerts, greetingFirstName } from "../lib/dashboardAlerts";
@@ -123,6 +123,7 @@ function DashboardPage({
   onNav,
   onOpenTask,
   onEditQuote,
+  onScheduleFromQuote,
   onQuotesRefresh,
   onTasksRefresh,
   onRefresh,
@@ -144,6 +145,10 @@ function DashboardPage({
   const quotesPending = quotes
     .filter(isQuotePending)
     .sort((a, b) => quoteSortDate(b) - quoteSortDate(a));
+  const recentUnscheduledQuotes = useMemo(
+    () => filterRecentUnscheduledQuotes(quotes, tasks),
+    [quotes, tasks],
+  );
   const compraUrgente = (inventory || []).filter(needsRestock);
   const today = todayISO();
   const weekEnd = formatISODate(new Date(Date.now() + 7 * 86400000));
@@ -204,9 +209,15 @@ function DashboardPage({
         </div>
       </div>
 
-      {/* Orçamentos & Estoque */}
+      <div className="dash-grid" style={{ marginBottom: 8 }}>
+        <div className="col-12">
+          <TodayBlock tasks={tasks} onOpenTask={onOpenTask}/>
+        </div>
+      </div>
+
+      {/* Orçamentos */}
       <div className="dash-section-title">
-        <span>Orçamentos & Estoque</span>
+        <span>Orçamentos</span>
         <div className="rule"></div>
       </div>
       <div className="dash-grid">
@@ -249,39 +260,68 @@ function DashboardPage({
           </DashboardCard>
         </div>
         <div className="col-6">
-          <div className="card stock-dash-mini" style={{ height: "100%" }}>
-            <div className="card-head">
-              <h3>
-                <span style={{ color: "var(--destructive)", display: "flex" }}><Icon.Package size={18}/></span>
-                Compras urgentes
-                <span className="count">{compraUrgente.length}</span>
-              </h3>
-              <div className="actions">
-                <button type="button" className="link-underline" onClick={() => onNav({ page: "stock" })} style={{ fontSize: 10 }}>
-                  Ver estoque
-                </button>
+          <DashboardCard
+            title="Orçamentos não agendados"
+            icon="Calendar"
+            count={recentUnscheduledQuotes.length}
+            action={(
+              <button
+                type="button"
+                className="link-underline"
+                onClick={() => onNav({ page: "quotes" })}
+                style={{ fontSize: 10 }}
+              >
+                Ver orçamentos
+              </button>
+            )}
+          >
+            <div className="muted small" style={{ padding: "0 0 10px", fontSize: 11 }}>
+              Aprovados · últimas 72h
+            </div>
+            {recentUnscheduledQuotes.length === 0 ? (
+              <div className="muted small" style={{ padding: 8 }}>
+                Nenhum aguardando agendamento.
               </div>
-            </div>
-            <div className="card-body stock-dash-mini-body">
-              {compraUrgente.length === 0 ? (
-                <div className="muted small" style={{ padding: "8px 0", textAlign: "center" }}>
-                  Nenhum produto abaixo de 20% da capacidade.
-                </div>
-              ) : (
-                compraUrgente.slice(0, 6).map((p) => (
-                  <div key={p.id} className="stock-dash-row" onClick={() => onNav({ page: "stock" })} role="button">
-                    <div style={{ minWidth: 0, flex: 1 }}>
-                      <div className="title" style={{ fontSize: 12 }}>{p.nome}</div>
-                      <div className="meta mono" style={{ fontSize: 10 }}>{p.sku} · sugerido +{suggestedOrderQty(p)} {p.unidade}</div>
-                    </div>
-                    <div style={{ width: 88, flexShrink: 0 }}>
-                      <StockLevelBar ratio={stockLevelRatio(p)}/>
-                    </div>
+            ) : null}
+            {recentUnscheduledQuotes.map((q) => (
+              <div key={q.id} className="task-list-row">
+                <span className="id mono">{q.id}</span>
+                <div style={{ minWidth: 0 }}>
+                  <div className="title" style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{q.projeto}</div>
+                  <div className="meta">
+                    <span>{q.cliente}</span>
+                    <span className="dotsep"></span>
+                    <span>{q.servico}</span>
+                    <span className="dotsep"></span>
+                    <span className="warn-text" style={{ color: "#d4a017" }}>{formatHoursSinceQuote(q)}</span>
                   </div>
-                ))
-              )}
-            </div>
-          </div>
+                </div>
+                <div className="right">
+                  <span className="amount mono" style={{ color: "var(--gold)", fontWeight: 500 }}>{formatEUR(q.valor)}</span>
+                  {!readOnly && onScheduleFromQuote ? (
+                    <button
+                      type="button"
+                      className="row-action"
+                      title="Agendar tarefa"
+                      onClick={(e) => { e.stopPropagation(); onScheduleFromQuote(q); }}
+                    >
+                      <Icon.Calendar size={14}/>
+                    </button>
+                  ) : null}
+                  {!readOnly ? (
+                    <button
+                      type="button"
+                      className="row-action"
+                      title="Ver orçamento"
+                      onClick={(e) => { e.stopPropagation(); onEditQuote?.(q.id); }}
+                    >
+                      <Icon.Eye size={14}/>
+                    </button>
+                  ) : null}
+                </div>
+              </div>
+            ))}
+          </DashboardCard>
         </div>
       </div>
 
@@ -473,9 +513,40 @@ function DashboardPage({
           </DashboardCard>
         </div>
 
-        {/* Today */}
         <div className="col-12">
-          <TodayBlock tasks={tasks} onOpenTask={onOpenTask}/>
+          <div className="card stock-dash-mini">
+            <div className="card-head">
+              <h3>
+                <span style={{ color: "var(--destructive)", display: "flex" }}><Icon.Package size={18}/></span>
+                Compras urgentes
+                <span className="count">{compraUrgente.length}</span>
+              </h3>
+              <div className="actions">
+                <button type="button" className="link-underline" onClick={() => onNav({ page: "stock" })} style={{ fontSize: 10 }}>
+                  Ver estoque
+                </button>
+              </div>
+            </div>
+            <div className="card-body stock-dash-mini-body">
+              {compraUrgente.length === 0 ? (
+                <div className="muted small" style={{ padding: "8px 0", textAlign: "center" }}>
+                  Nenhum produto abaixo de 20% da capacidade.
+                </div>
+              ) : (
+                compraUrgente.slice(0, 6).map((p) => (
+                  <div key={p.id} className="stock-dash-row" onClick={() => onNav({ page: "stock" })} role="button">
+                    <div style={{ minWidth: 0, flex: 1 }}>
+                      <div className="title" style={{ fontSize: 12 }}>{p.nome}</div>
+                      <div className="meta mono" style={{ fontSize: 10 }}>{p.sku} · sugerido +{suggestedOrderQty(p)} {p.unidade}</div>
+                    </div>
+                    <div style={{ width: 88, flexShrink: 0 }}>
+                      <StockLevelBar ratio={stockLevelRatio(p)}/>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
         </div>
 
         <div className="col-12">

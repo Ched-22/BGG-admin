@@ -489,7 +489,7 @@ function ScheduleModal({ open, task, tasks = EMPTY_TASKS, events = [], defaultDa
                   err={!!err.dropoffDate}
                 />
               </Field>
-              <Field label="Hora de entrega" error={err.dropoffTime} hint="Formato 24 horas (ex: 20:00) · horário comunicado ao cliente (WhatsApp)">
+              <Field label="Hora de entrega" error={err.dropoffTime} hint="Selecione o horário em formato 24h · comunicado ao cliente (WhatsApp)">
                 <TimeInput24
                   value={dropoffTime}
                   onChange={setDropoffTime}

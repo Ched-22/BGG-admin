@@ -3,6 +3,7 @@ import { BGG_DATA } from "../data/bggData";
 import { useAuth } from "../context/AuthContext";
 import { canViewTaskActivityLog } from "../lib/permissions";
 import { InspectionReportPanel } from "../components/InspectionReportPanel";
+import { TaskPickupPaymentCard } from "../components/TaskPickupPaymentCard";
 import { getInspectionByTask } from "../lib/vehicleInspectionApi";
 import {
   Button, Icon, PageRefreshButton, Field, Input, Select, Textarea, StatusBadge, Modal, formatEUR, useToast, useConfirm,
@@ -562,6 +563,7 @@ function TaskDetail({
 
         {/* Right column */}
         <div className="col" style={{ gap: 18 }}>
+          <TaskPickupPaymentCard task={task} readOnly={readOnly} />
           {/* Schedule + Tech */}
           <div className="card">
             <div className="card-head"><h3><Icon.Calendar size={18}/> Agenda &amp; Técnico</h3></div>

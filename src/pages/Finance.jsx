@@ -15,11 +15,14 @@ import {
   EXPENSE_CATEGORIES,
   createFinanceExpense,
   deleteFinanceExpense,
+  fetchFinanceRevenue,
+  fetchFinanceRevenueSummary,
   fetchFinanceSummary,
   listEmployeeCosts,
   listFinanceExpenses,
   upsertEmployeeCost,
 } from "../lib/financeApi";
+import { REVENUE_TABS, PAYMENT_METHODS } from "../lib/taskPaymentApi";
 import { resolveFinancePeriodBounds, summaryMatchesPreset } from "../lib/financePeriod";
 
 const PRESETS = [
@@ -88,6 +91,10 @@ export function FinancePage() {
   const [savingExpense, setSavingExpense] = useState(false);
   const [editingCostId, setEditingCostId] = useState(null);
   const [costDraft, setCostDraft] = useState("");
+  const [revenueTab, setRevenueTab] = useState("pending");
+  const [revenueSummary, setRevenueSummary] = useState(null);
+  const [revenueRows, setRevenueRows] = useState([]);
+  const [revenueLoading, setRevenueLoading] = useState(false);
 
   const loadSummary = useCallback(async (options) => {
     if (options.periodStart && options.periodEnd) {
@@ -193,6 +200,29 @@ export function FinancePage() {
     ]);
     setSummary(summaryData);
   }, [summaryQuery, loadSummary, loadLists]);
+
+  const loadRevenue = useCallback(async () => {
+    if (customRangeInvalid) return;
+    setRevenueLoading(true);
+    try {
+      const [summaryData, listData] = await Promise.all([
+        fetchFinanceRevenueSummary(summaryQuery),
+        fetchFinanceRevenue({ ...summaryQuery, paymentStatus: revenueTab }),
+      ]);
+      setRevenueSummary(summaryData);
+      setRevenueRows(listData.data ?? []);
+    } catch {
+      toast({ kind: "error", title: "Falha ao carregar receita" });
+    } finally {
+      setRevenueLoading(false);
+    }
+  }, [summaryQuery, revenueTab, customRangeInvalid, toast]);
+
+  useEffect(() => {
+    if (!summary || customRangeInvalid) return undefined;
+    loadRevenue();
+    return undefined;
+  }, [summary, customRangeInvalid, loadRevenue]);
 
   const handleRefresh = async () => {
     setRefreshing(true);
@@ -370,13 +400,92 @@ export function FinancePage() {
             </div>
           ) : null}
           <div className="dash-grid" style={{ marginBottom: 22 }}>
-            <div className="col-3"><KpiCard label="Receita total" value={formatEUR(summary.totalRevenue)} hint={`${summary.completedServicesCount} serviços concluídos`} /></div>
+            <div className="col-3"><KpiCard label="Receita total" value={formatEUR(summary.totalRevenue)} hint={summary.pendingRevenue > 0 ? `${formatEUR(summary.pendingRevenue)} pendente` : `${summary.completedServicesCount} pagamentos concluídos`} /></div>
             <div className="col-3"><KpiCard label="Receita média" value={formatEUR(summary.averageRevenue)} hint="Por serviço concluído" /></div>
             <div className="col-3"><KpiCard label="Custo produtos" value={formatEUR(summary.productCosts)} hint="Consumo de stock" tone="negative" /></div>
             <div className="col-3"><KpiCard label="Custo funcionários" value={formatEUR(summary.employeeCosts)} hint="Técnicos (rateado)" tone="negative" /></div>
             <div className="col-3"><KpiCard label="Despesas contas" value={formatEUR(summary.accountExpenses)} tone="negative" /></div>
             <div className="col-3"><KpiCard label="Lucro bruto" value={formatEUR(summary.grossProfit)} tone={profitTone(summary.grossProfit)} /></div>
             <div className="col-3"><KpiCard label="Lucro líquido" value={formatEUR(summary.netProfit)} tone={profitTone(summary.netProfit)} /></div>
+          </div>
+
+          <div className="card" style={{ marginBottom: 22 }}>
+            <div className="card-head">
+              <h3><Icon.DollarSign size={18}/> Receita</h3>
+              <div className="actions row" style={{ gap: 8 }}>
+                {REVENUE_TABS.map((tab) => (
+                  <button
+                    key={tab.id}
+                    type="button"
+                    className={revenueTab === tab.id ? "link-underline" : "muted small"}
+                    style={{
+                      fontSize: 10,
+                      color: revenueTab === tab.id ? "var(--gold)" : undefined,
+                      background: "none",
+                      border: "none",
+                      cursor: "pointer",
+                    }}
+                    onClick={() => setRevenueTab(tab.id)}
+                  >
+                    {tab.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="card-body" style={{ padding: 0 }}>
+              {revenueSummary ? (
+                <div className="row" style={{ gap: 16, padding: "12px 16px", borderBottom: "1px solid var(--border)", flexWrap: "wrap" }}>
+                  <span className="tiny muted">Pendente: <span className="mono">{formatEUR(revenueSummary.pendingTotal)}</span> ({revenueSummary.pendingCount})</span>
+                  <span className="tiny muted">Parcelas: <span className="mono">{formatEUR(revenueSummary.installmentsOpenTotal)}</span> ({revenueSummary.installmentsOpenCount})</span>
+                  <span className="tiny muted">Concluído: <span className="mono">{formatEUR(revenueSummary.completedTotal)}</span> ({revenueSummary.completedCount})</span>
+                </div>
+              ) : null}
+              {revenueLoading ? (
+                <div className="muted small" style={{ padding: 20, textAlign: "center" }}>A carregar receita…</div>
+              ) : (
+                <table className="tbl">
+                  <thead>
+                    <tr>
+                      <th>Tarefa</th>
+                      <th>Cliente</th>
+                      <th>Serviço</th>
+                      <th style={{ textAlign: "right" }}>Valor</th>
+                      <th>Método</th>
+                      <th>Parcelas</th>
+                      <th>Data</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {revenueRows.map((row) => (
+                      <tr key={row.taskDisplayId}>
+                        <td className="mono">{row.taskDisplayId}</td>
+                        <td>{row.clientName}</td>
+                        <td className="muted small">{row.serviceLabel}</td>
+                        <td style={{ textAlign: "right" }} className="mono">{formatEUR(row.amountDue)}</td>
+                        <td className="muted small">
+                          {PAYMENT_METHODS.find((m) => m.id === row.paymentMethod)?.label ?? row.paymentMethod ?? "—"}
+                        </td>
+                        <td className="mono small">
+                          {row.isInstallment
+                            ? `${row.installmentsPaid}/${row.installmentCount}`
+                            : "—"}
+                        </td>
+                        <td className="mono small muted">
+                          {(row.paidAt || row.serviceCompletedAt || "—").slice(0, 10)}
+                        </td>
+                      </tr>
+                    ))}
+                    {revenueRows.length === 0 ? (
+                      <tr>
+                        <td colSpan="7" className="muted small" style={{ textAlign: "center", padding: 24 }}>
+                          Nenhum registo neste filtro.
+                        </td>
+                      </tr>
+                    ) : null}
+                  </tbody>
+                </table>
+              )}
+            </div>
           </div>
 
           <div className="card" style={{ marginBottom: 22 }}>

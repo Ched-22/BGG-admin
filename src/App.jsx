@@ -702,6 +702,7 @@ function App() {
             onNav={nav}
             onOpenTask={openTask}
             onEditQuote={onEditQuote}
+            onScheduleFromQuote={onScheduleFromQuote}
             onQuotesRefresh={loadQuotes}
             onTasksRefresh={loadTasks}
             onRefresh={refreshDashboard}

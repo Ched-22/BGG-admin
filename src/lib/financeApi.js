@@ -47,3 +47,35 @@ export async function upsertEmployeeCost(userId, body) {
   const { data } = await api.put(`/finance/employee-costs/${userId}`, body);
   return data;
 }
+
+export async function fetchFinanceRevenueSummary({ preset = 'month', periodStart, periodEnd } = {}) {
+  const params = periodStart && periodEnd
+    ? { periodStart, periodEnd }
+    : { preset };
+  const { data } = await api.get('/finance/revenue/summary', {
+    params,
+    headers: { 'Cache-Control': 'no-cache' },
+  });
+  return data;
+}
+
+export async function fetchFinanceRevenue({
+  preset = 'month',
+  periodStart,
+  periodEnd,
+  paymentStatus,
+  page = 1,
+  limit = 20,
+} = {}) {
+  const params = {
+    ...(periodStart && periodEnd ? { periodStart, periodEnd } : { preset }),
+    page,
+    limit,
+    ...(paymentStatus ? { paymentStatus } : {}),
+  };
+  const { data } = await api.get('/finance/revenue', {
+    params,
+    headers: { 'Cache-Control': 'no-cache' },
+  });
+  return data;
+}

@@ -1,54 +1,32 @@
-import React, { useEffect, useState } from "react";
-import { Input } from "./ui";
-import { normalizeTime24 } from "../lib/scheduling";
+import React, { useMemo } from "react";
+import { Select } from "./ui";
+import { buildTimeDropdownOptions, normalizeTime24, withTimeOption } from "../lib/scheduling";
 
-function TimeInput24({ value = "", onChange, err, placeholder = "HH:MM", ...rest }) {
-  const [draft, setDraft] = useState(value || "");
-
-  useEffect(() => {
-    setDraft(value || "");
-  }, [value]);
-
-  const commit = (raw) => {
-    const trimmed = String(raw || "").trim();
-    if (!trimmed) {
-      onChange?.("");
-      setDraft("");
-      return;
-    }
-    const normalized = normalizeTime24(trimmed);
-    if (normalized) {
-      onChange?.(normalized);
-      setDraft(normalized);
-      return;
-    }
-    setDraft(value || "");
-  };
-
-  const handleChange = (e) => {
-    let next = e.target.value.replace(/[^\d:]/g, "");
-    if (next.length === 2 && !next.includes(":") && draft.length < 2) {
-      next = `${next}:`;
-    }
-    if (next.length > 5) next = next.slice(0, 5);
-    setDraft(next);
-  };
+function TimeInput24({
+  value = "",
+  onChange,
+  err,
+  options,
+  placeholder = "Selecione o horário",
+  ...rest
+}) {
+  const slots = useMemo(() => {
+    const base = options || buildTimeDropdownOptions();
+    return withTimeOption(base, value);
+  }, [options, value]);
 
   return (
-    <Input
-      type="text"
-      inputMode="numeric"
-      autoComplete="off"
-      placeholder={placeholder}
-      value={draft}
-      onChange={handleChange}
-      onBlur={() => commit(draft)}
-      onKeyDown={(e) => {
-        if (e.key === "Enter") commit(draft);
-      }}
+    <Select
+      value={value || ""}
+      onChange={(e) => onChange?.(e.target.value)}
       err={err}
       {...rest}
-    />
+    >
+      <option value="">{placeholder}</option>
+      {slots.map((slot) => (
+        <option key={slot} value={slot}>{slot}</option>
+      ))}
+    </Select>
   );
 }
 

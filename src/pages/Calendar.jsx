@@ -5,7 +5,7 @@ import { ExportMenu } from "../components/ExportMenu";
 import { CALENDAR_EXPORT_COLUMNS } from "../lib/exportColumns";
 import { ScheduleModal } from "../components/modals/TaskModals";
 import { mapTechniciansForPicker } from "../lib/technicianApi";
-import { formatDurationHours, buildMonthDays, formatISODate, todayISO, getWeekGridEndHour, formatEventTimeRange, buildWeekEventBlocks, BAIAS } from "../lib/scheduling";
+import { formatDurationHours, buildMonthDays, formatISODate, todayISO, getWeekGridEndHour, formatEventTimeRange, formatSegmentTimeRange, buildWeekEventBlocksForDay, eventTouchesDate, getEventSegmentOnDate, BAIAS } from "../lib/scheduling";
 
 const PT_MONTHS = ["Janeiro","Fevereiro","Março","Abril","Maio","Junho","Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"];
 const PT_DOW_LONG = ["Domingo","Segunda","Terça","Quarta","Quinta","Sexta","Sábado"];
@@ -40,7 +40,9 @@ function CalendarPage({ readOnly = false, onOpenTask, events = [], tasks = [], t
   const days = buildMonthDays(cursor.y, cursor.m);
   const todayISOValue = todayISO();
 
-  const eventsForDay = (iso) => filteredEvents.filter(e => e.data === iso).sort((a, b) => (a.horario || "").localeCompare(b.horario || ""));
+  const eventsForDay = (iso) => filteredEvents
+    .filter((e) => eventTouchesDate(e, iso))
+    .sort((a, b) => (a.horario || "").localeCompare(b.horario || ""));
 
   const selDate = new Date(selectedDate + "T00:00:00");
   const selEvents = eventsForDay(selectedDate);
@@ -160,7 +162,7 @@ function CalendarPage({ readOnly = false, onOpenTask, events = [], tasks = [], t
                   const inMonth = d.getMonth() === cursor.m;
                   const isToday = iso === todayISOValue;
                   const sel = iso === selectedDate;
-                  const has = filteredEvents.some(e => e.data === iso);
+                  const has = filteredEvents.some((e) => eventTouchesDate(e, iso));
                   return (
                     <button
                       key={i}
@@ -257,17 +259,20 @@ function CalendarPage({ readOnly = false, onOpenTask, events = [], tasks = [], t
                             const bayEvs = dayEvs.filter((e) => (Number(e.baia) || 1) === bay);
                             return (
                               <div key={bay} className={`cal-day-bay bay-${bay}`}>
-                                {bayEvs.slice(0, 2).map((e) => (
+                                {bayEvs.slice(0, 2).map((e) => {
+                                  const daySegment = getEventSegmentOnDate(e, iso);
+                                  return (
                                   <div
                                     key={e.id}
                                     className={`ev bay-${bay} ${serviceClass(e.servico) || "s-cer"}`}
                                     onClick={(ev) => { ev.stopPropagation(); onOpenTask(e.id); }}
                                     title={`${formatEventTimeRange({ ...e, data: e.data })} · Baia ${bay} · ${e.title}`}
                                   >
-                                    <span className="time">{formatEventTimeRange({ ...e, data: e.data })}</span>
+                                    <span className="time">{daySegment ? formatSegmentTimeRange(daySegment) : formatEventTimeRange({ ...e, data: e.data })}</span>
                                     {e.title}
                                   </div>
-                                ))}
+                                  );
+                                })}
                                 {bayEvs.length > 2 ? <div className="more">+{bayEvs.length - 2}</div> : null}
                               </div>
                             );
@@ -340,16 +345,16 @@ function CalendarPage({ readOnly = false, onOpenTask, events = [], tasks = [], t
                         className="cal-week-day-events"
                         style={{ gridColumn: di + 2, gridRow: `2 / span ${hourCount}` }}
                       >
-                        {buildWeekEventBlocks(eventsForDay(iso), weekGridMinutes).map(({ event: e, style }) => (
+                        {buildWeekEventBlocksForDay(iso, filteredEvents, weekGridMinutes).map(({ event: e, segment, style }) => (
                           <div
-                            key={e.id}
-                            className={`ev cal-week-block bay-${Number(e.baia) || 1} ${serviceClass(e.servico) || "s-cer"}`}
+                            key={`${e.id}-${segment.date}-${segment.start}`}
+                            className={`ev cal-week-block bay-${Number(e.baia) || 1} ${segment.isContinuation ? "continuation" : ""} ${serviceClass(e.servico) || "s-cer"}`}
                             style={style}
                             onClick={(ev) => { ev.stopPropagation(); onOpenTask(e.id); }}
-                            title={`${formatEventTimeRange({ ...e, data: e.data })} · Baia ${e.baia ?? 1} · ${e.title}`}
+                            title={`${formatEventTimeRange({ ...e, data: e.data })} · Baia ${e.baia ?? 1} · ${e.title}${segment.isContinuation ? " · continuação" : ""}`}
                           >
-                            <span className="time">{formatEventTimeRange({ ...e, data: e.data })}</span>
-                            <span className="ev-title">B{e.baia ?? 1} · {e.title}</span>
+                            <span className="time">{formatSegmentTimeRange(segment)}</span>
+                            <span className="ev-title">B{e.baia ?? 1} · {e.title}{segment.isContinuation ? " ↪" : ""}</span>
                           </div>
                         ))}
                       </div>

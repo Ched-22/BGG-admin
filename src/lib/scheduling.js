@@ -3,14 +3,38 @@ import { isClosedTaskStatus } from './taskApi';
 
 export const BAIAS = [1, 2];
 export const WORK_START_MIN = 8 * 60;
-export const WORK_END_MIN = 18 * 60;
+export const WORK_END_MIN = 19 * 60;
+export const SATURDAY_WORK_END_MIN = 13 * 60;
+/** Início do serviço em dias de continuação (após ultrapassar o fechamento). */
+export const WORK_CONTINUE_START_MIN = 9 * 60;
 export const MAX_PRESET_DURATION_HOURS = 8;
 export const DURATION_OTHER = "other";
 export const DURATION_HOUR_OPTIONS = [0.5, 1, 1.5, 2, 2.5, 3, 4, 5, 6, 8];
 export const SCHEDULE_TIME_SLOTS = [
   "08:00", "08:30", "09:00", "09:30", "10:00", "10:30", "11:00", "11:30",
   "13:00", "13:30", "14:00", "14:30", "15:00", "15:30", "16:00", "16:30", "17:00", "17:30",
+  "18:00", "18:30",
 ];
+
+/** Opções de horário 24h para dropdown (intervalos de 30 min). */
+export function buildTimeDropdownOptions({
+  startHour = 6,
+  endHour = 22,
+  stepMinutes = 30,
+} = {}) {
+  const options = [];
+  const endMin = endHour * 60 + 59;
+  for (let min = startHour * 60; min <= endMin; min += stepMinutes) {
+    options.push(minutesToTime(min));
+  }
+  return options;
+}
+
+export function withTimeOption(options, value) {
+  const normalized = normalizeTime24(value);
+  if (!normalized || options.includes(normalized)) return options;
+  return [...options, normalized].sort();
+}
 
 export function isPresetDurationHours(hours) {
   const h = Number(hours);
@@ -230,57 +254,190 @@ export function countEligibleTechniciansOnDate(
 }
 
 export function formatEventTimeRange(event) {
-  const slot = getEventSlot(event);
-  return `${minutesToTime(slot.start)}–${minutesToTime(slot.end)}`;
+  const segments = splitEventIntoBusinessSegments(event);
+  if (!segments.length) return "—";
+  if (segments.length === 1) return formatSegmentTimeRange(segments[0]);
+  const first = segments[0];
+  const last = segments[segments.length - 1];
+  if (first.date === last.date) return formatSegmentTimeRange(first);
+  return `${minutesToTime(first.start)} (${formatShortDate(first.date)}) → ${minutesToTime(last.end)} (${formatShortDate(last.date)})`;
+}
+
+export function formatSegmentTimeRange(segment) {
+  return `${minutesToTime(segment.start)}–${minutesToTime(segment.end)}`;
+}
+
+function formatShortDate(iso) {
+  if (!iso) return "";
+  const [, month, day] = iso.split("-");
+  return `${day}/${month}`;
+}
+
+export function addDaysToIso(iso, days) {
+  const d = new Date(`${iso}T12:00:00`);
+  d.setDate(d.getDate() + days);
+  return formatISODate(d);
+}
+
+export function getIsoDayOfWeek(iso) {
+  return new Date(`${iso}T12:00:00`).getDay();
+}
+
+export function isSunday(iso) {
+  return getIsoDayOfWeek(iso) === 0;
+}
+
+export function isSaturday(iso) {
+  return getIsoDayOfWeek(iso) === 6;
+}
+
+export function getWorkEndMinForDate(iso) {
+  if (isSaturday(iso)) return SATURDAY_WORK_END_MIN;
+  return WORK_END_MIN;
+}
+
+/** Próximo dia útil após esgotar o horário do dia (sábado → segunda; domingo ignorado). */
+export function advanceToNextBusinessDate(iso) {
+  if (isSaturday(iso)) {
+    return addDaysToIso(iso, 2);
+  }
+  const next = addDaysToIso(iso, 1);
+  if (isSunday(next)) {
+    return addDaysToIso(next, 1);
+  }
+  return next;
+}
+
+/**
+ * Divide o serviço em segmentos dentro do horário comercial.
+ * Seg–sex até 19:00; sábado até 13:00; domingo fechado (continua na segunda às 9:00).
+ */
+export function splitEventIntoBusinessSegments(event) {
+  if (!event?.data || !event?.horario) return [];
+
+  const totalMinutes = getDurationMinutes(event);
+  if (totalMinutes <= 0) return [];
+
+  let remaining = totalMinutes;
+  let currentDate = event.data;
+  const segments = [];
+  let dayIndex = 0;
+
+  while (remaining > 0 && dayIndex < 366) {
+    if (isSunday(currentDate)) {
+      currentDate = addDaysToIso(currentDate, 1);
+      dayIndex += 1;
+      continue;
+    }
+
+    const workEnd = getWorkEndMinForDate(currentDate);
+    const start = dayIndex === 0 ? parseTimeToMinutes(event.horario) : WORK_CONTINUE_START_MIN;
+
+    if (start >= workEnd) {
+      currentDate = advanceToNextBusinessDate(currentDate);
+      dayIndex += 1;
+      continue;
+    }
+
+    const availableToday = workEnd - start;
+    const used = Math.min(remaining, availableToday);
+    segments.push({
+      event,
+      date: currentDate,
+      start,
+      end: start + used,
+      segmentIndex: segments.length,
+    });
+    remaining -= used;
+
+    if (remaining > 0) {
+      currentDate = advanceToNextBusinessDate(currentDate);
+      dayIndex += 1;
+    }
+  }
+
+  return segments.map((segment, index, all) => ({
+    ...segment,
+    segmentIndex: index,
+    segmentCount: all.length,
+    isContinuation: index > 0,
+  }));
+}
+
+export function getEventSegmentOnDate(event, iso) {
+  return splitEventIntoBusinessSegments(event).find((segment) => segment.date === iso) || null;
+}
+
+export function eventTouchesDate(event, iso) {
+  return !!getEventSegmentOnDate(event, iso);
 }
 
 export function getEventEndHour(event) {
-  return Math.ceil(getEventSlot(event).end / 60);
+  const segments = splitEventIntoBusinessSegments(event);
+  if (!segments.length) return Math.ceil(getEventSlot(event).end / 60);
+  return Math.max(...segments.map((segment) => Math.ceil(segment.end / 60)));
 }
 
 export function getWeekGridEndHour(events, isoDates, minHour = WORK_END_MIN / 60) {
   let maxHour = minHour;
   const dateSet = new Set(isoDates || []);
   for (const e of events) {
-    if (!dateSet.has(e.data)) continue;
-    const endHour = getEventEndHour(e);
-    if (endHour > maxHour) maxHour = endHour;
+    for (const segment of splitEventIntoBusinessSegments(e)) {
+      if (!dateSet.has(segment.date)) continue;
+      const endHour = Math.ceil(segment.end / 60);
+      if (endHour > maxHour) maxHour = Math.min(endHour, WORK_END_MIN / 60);
+    }
   }
   return maxHour;
 }
 
-/** Posiciona eventos na grade semanal: altura proporcional à duração, coluna fixa por baia. */
-export function buildWeekEventBlocks(dayEvents, weekGridMinutes, bays = BAIAS) {
+function buildWeekEventBlockStyle(segment, weekGridMinutes, bays = BAIAS) {
   const gridStart = WORK_START_MIN;
   const gridEnd = gridStart + weekGridMinutes;
-  const laneCount = bays.length;
+  const baia = Number(segment.event.baia) || 1;
+  const laneIndex = Math.max(0, Math.min(baia - 1, bays.length - 1));
+  const laneWidthPct = 100 / bays.length;
 
-  return dayEvents
-    .map((event) => {
-      const slot = getEventSlot(event);
-      const baia = Number(event.baia) || 1;
-      const laneIndex = Math.max(0, Math.min(baia - 1, laneCount - 1));
-      const laneWidthPct = 100 / laneCount;
+  const visibleStart = Math.max(segment.start, gridStart);
+  const visibleEnd = Math.min(segment.end, gridEnd);
+  if (visibleEnd <= visibleStart) return null;
 
-      const visibleStart = Math.max(slot.start, gridStart);
-      const visibleEnd = Math.min(slot.end, gridEnd);
-      if (visibleEnd <= visibleStart) return null;
+  const topPct = ((visibleStart - gridStart) / weekGridMinutes) * 100;
+  const heightPct = ((visibleEnd - visibleStart) / weekGridMinutes) * 100;
 
-      const topPct = ((visibleStart - gridStart) / weekGridMinutes) * 100;
-      const heightPct = ((visibleEnd - visibleStart) / weekGridMinutes) * 100;
+  return {
+    top: `${topPct}%`,
+    height: `${heightPct}%`,
+    left: `calc(2px + ${laneIndex * laneWidthPct}%)`,
+    width: `calc(${laneWidthPct}% - 4px)`,
+  };
+}
 
-      return {
-        event,
-        baia,
-        style: {
-          top: `${topPct}%`,
-          height: `${heightPct}%`,
-          left: `calc(2px + ${laneIndex * laneWidthPct}%)`,
-          width: `calc(${laneWidthPct}% - 4px)`,
-        },
-      };
-    })
-    .filter(Boolean);
+/** Posiciona segmentos do dia na grade semanal (com continuação em dias seguintes). */
+export function buildWeekEventBlocksForDay(iso, events, weekGridMinutes, bays = BAIAS) {
+  const blocks = [];
+  for (const event of events) {
+    for (const segment of splitEventIntoBusinessSegments(event)) {
+      if (segment.date !== iso) continue;
+      const style = buildWeekEventBlockStyle(segment, weekGridMinutes, bays);
+      if (!style) continue;
+      blocks.push({ event, segment, style });
+    }
+  }
+  return blocks;
+}
+
+/** @deprecated Use buildWeekEventBlocksForDay */
+export function buildWeekEventBlocks(dayEvents, weekGridMinutes, bays = BAIAS) {
+  const blocks = [];
+  for (const event of dayEvents) {
+    for (const segment of splitEventIntoBusinessSegments(event)) {
+      const style = buildWeekEventBlockStyle(segment, weekGridMinutes, bays);
+      if (!style) continue;
+      blocks.push({ event, segment, style });
+    }
+  }
+  return blocks;
 }
 
 export function formatISODate(d) {
