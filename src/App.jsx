@@ -7,6 +7,7 @@ import { useAuth } from "./context/AuthContext";
 import { LoginScreen, RegisterScreen, ForgotScreen, ResetScreen } from "./pages/auth";
 import { Sidebar, TopBar } from "./components/layout/Chrome";
 import { NotificationPanel } from "./components/NotificationPanel";
+import { NotificationAlertModal } from "./components/NotificationAlertModal";
 import { DashboardPage } from "./pages/Dashboard";
 import { TasksPage, TaskDetail } from "./pages/Tasks";
 import { AssignTechModal, ScheduleModal, CreateTaskModal, TaskOrcamentoModal } from "./components/modals/TaskModals";
@@ -54,6 +55,7 @@ import {
 } from "./lib/whatsapp";
 import { resolveClientPreferredLanguage } from "./lib/clientLanguage";
 import { getUnreadCount } from "./lib/notificationApi";
+import { useNotificationPopup } from "./lib/notificationPopup";
 
 function readResetTokenFromUrl() {
   try {
@@ -176,6 +178,19 @@ function App() {
     const timer = setInterval(refreshUnreadCount, 60000);
     return () => clearInterval(timer);
   }, [isAuthenticated, refreshUnreadCount]);
+
+  const { current: popupNotification, dismissCurrent: dismissPopup } = useNotificationPopup({
+    enabled: isAuthenticated,
+  });
+
+  const handlePopupOk = useCallback(() => {
+    dismissPopup();
+  }, [dismissPopup]);
+
+  const handlePopupOpenPanel = useCallback(() => {
+    dismissPopup();
+    setNotifOpen(true);
+  }, [dismissPopup]);
 
   useEffect(() => {
     if (!isAuthenticated && sessionExpired) {
@@ -844,6 +859,11 @@ function App() {
         task={tasks.find((t) => t.id === taskQuoteFor) ?? null}
         onClose={() => setTaskQuoteFor(null)}
         onSave={saveTaskOrcamento}
+      />
+      <NotificationAlertModal
+        notification={popupNotification}
+        onOk={handlePopupOk}
+        onOpenPanel={handlePopupOpenPanel}
       />
       <NotificationPanel
         open={notifOpen}

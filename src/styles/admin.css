@@ -801,6 +801,9 @@ a { color: var(--gold); text-decoration: none; }
 .modal-overlay[data-layer="confirm"] {
   z-index: 80;
 }
+.modal-overlay[data-layer="alert"] {
+  z-index: 90;
+}
 @keyframes fadein { from { opacity: 0; } to { opacity: 1; } }
 @keyframes slidein { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 .modal {
