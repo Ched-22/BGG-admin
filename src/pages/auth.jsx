@@ -63,15 +63,6 @@ function AuthNotice({ children, tone = "error" }) {
   );
 }
 
-function validatePasswordEs(pw) {
-  if (!pw) return "La contraseña es obligatoria";
-  if (pw.length < 8) return "La contraseña debe tener al menos 8 caracteres";
-  if (!(/[A-Z]/.test(pw) && /[a-z]/.test(pw) && /\d/.test(pw) && /[^A-Za-z0-9]/.test(pw))) {
-    return "La contraseña debe incluir mayúscula, minúscula, número y carácter especial";
-  }
-  return null;
-}
-
 function validatePassword(pw) {
   if (!pw) return "Senha é obrigatória";
   if (pw.length < 8) return "A senha deve ter pelo menos 8 caracteres";
@@ -402,8 +393,8 @@ function ForgotScreen({ onGo }) {
   const [loading, setLoading] = useState(false);
 
   const send = async () => {
-    if (!email) { setErr("La dirección de correo es obligatoria"); return; }
-    if (!/^\S+@\S+\.\S+$/.test(email)) { setErr("Introduzca una dirección de correo válida"); return; }
+    if (!email) { setErr("Endereço de e-mail é obrigatório"); return; }
+    if (!/^\S+@\S+\.\S+$/.test(email)) { setErr("Digite um endereço de e-mail válido"); return; }
     setErr("");
     setLoading(true);
     try {
@@ -411,7 +402,7 @@ function ForgotScreen({ onGo }) {
       setSent(true);
     } catch (err) {
       const msg = err.response?.data?.message;
-      setErr(Array.isArray(msg) ? msg.join(", ") : msg || "No se pudieron enviar las instrucciones.");
+      setErr(Array.isArray(msg) ? msg.join(", ") : msg || "Não foi possível enviar as instruções.");
     } finally {
       setLoading(false);
     }
@@ -425,23 +416,23 @@ function ForgotScreen({ onGo }) {
   return (
     <div className="auth-wrap">
       <AuthArt caption={{
-        title: <><i>Recupere</i><br/>su acceso.</>,
-        body: "Introduzca su correo administrativo y le enviaremos un enlace seguro para restablecer su contraseña en pocos minutos."
+        title: <><i>Recupere</i><br/>seu acesso.</>,
+        body: "Digite seu e-mail administrativo e enviaremos um link seguro para redefinir sua senha em poucos minutos."
       }}/>
       <div className="auth-form-wrap">
         <form className="auth-form" onSubmit={submit}>
           <div className="heading">
-            <span className="eye">Olvidé mi contraseña</span>
-            <h2>Recuperar acceso.</h2>
-            <p>Introduzca el correo vinculado a su cuenta administrativa para recibir las instrucciones.</p>
+            <span className="eye">Esqueci minha senha</span>
+            <h2>Recuperar acesso.</h2>
+            <p>Digite o e-mail vinculado à sua conta administrativa para receber as instruções.</p>
           </div>
 
           {!sent ? (
             <>
-              <Field label="Correo electrónico" error={err}>
+              <Field label="Endereço de e-mail" error={err}>
                 <Input
                   type="email"
-                  placeholder="su@correo.com"
+                  placeholder="seu@email.com.br"
                   value={email}
                   leading={<Icon.Mail size={14}/>}
                   onChange={(e) => setEmail(e.target.value)}
@@ -450,7 +441,7 @@ function ForgotScreen({ onGo }) {
                 />
               </Field>
               <Button type="submit" size="lg" disabled={loading}>
-                {loading ? "Enviando…" : "Enviar instrucciones"} {!loading ? <Icon.ArrowRight size={14}/> : null}
+                {loading ? "Enviando…" : "Enviar instruções"} {!loading ? <Icon.ArrowRight size={14}/> : null}
               </Button>
             </>
           ) : (
@@ -467,23 +458,23 @@ function ForgotScreen({ onGo }) {
                 <span style={{ color: "var(--gold)", marginTop: 2 }}><Icon.CheckCircle size={20}/></span>
                 <div>
                   <div style={{ color: "var(--gold)", fontSize: 13, fontWeight: 500, marginBottom: 4 }}>
-                    Instrucciones enviadas
+                    Instruções enviadas
                   </div>
                   <div style={{ fontSize: 12.5, color: "var(--fg-4)", lineHeight: 1.6 }}>
-                    Si existe una cuenta administrativa asociada a <strong style={{ color: "var(--fg)" }}>{email}</strong>,
-                    le hemos enviado un enlace de restablecimiento. Compruebe también la carpeta de spam.
+                    Se existir uma conta administrativa associada a <strong style={{ color: "var(--fg)" }}>{email}</strong>,
+                    enviamos um link de redefinição. Verifique também a pasta de spam.
                   </div>
                 </div>
               </div>
               <Button variant="secondary" onClick={() => { setSent(false); send(); }} disabled={loading}>
-                {loading ? "Reenviando…" : "Reenviar correo"} {!loading ? <Icon.RefreshCw size={14}/> : null}
+                {loading ? "Reenviando…" : "Reenviar e-mail"} {!loading ? <Icon.RefreshCw size={14}/> : null}
               </Button>
             </>
           )}
 
           <div className="links">
-            <button type="button" className="link-underline" onClick={() => onGo("login")}>Iniciar sesión</button>
-            <button type="button" className="link-underline" onClick={() => onGo("register")}>Registrarse</button>
+            <button type="button" className="link-underline" onClick={() => onGo("login")}>Entrar</button>
+            <button type="button" className="link-underline" onClick={() => onGo("register")}>Cadastrar-se</button>
           </div>
         </form>
       </div>
@@ -503,11 +494,11 @@ function ResetScreen({ onGo, resetToken, onResetSuccess }) {
   const submit = async (e) => {
     e.preventDefault();
     const next = {};
-    const pwErr = validatePasswordEs(pw);
+    const pwErr = validatePassword(pw);
     if (pwErr) next.pw = pwErr;
-    if (!pw2) next.pw2 = "Confirme su contraseña.";
-    else if (pw && pw2 && pw !== pw2) next.pw2 = "Las contraseñas no coinciden";
-    if (!resetToken) next.pw = "Enlace no válido. Solicite un nuevo restablecimiento.";
+    if (!pw2) next.pw2 = "Confirme sua senha.";
+    else if (pw && pw2 && pw !== pw2) next.pw2 = "As senhas não coincidem";
+    if (!resetToken) next.pw = "Link inválido. Solicite uma nova redefinição.";
     setErr(next);
     if (Object.keys(next).length) return;
 
@@ -519,7 +510,7 @@ function ResetScreen({ onGo, resetToken, onResetSuccess }) {
       onResetSuccess?.();
     } catch (err) {
       const msg = err.response?.data?.message;
-      setGeneric(Array.isArray(msg) ? msg.join(", ") : msg || "No se pudo restablecer la contraseña.");
+      setGeneric(Array.isArray(msg) ? msg.join(", ") : msg || "Não foi possível redefinir a senha.");
     } finally {
       setLoading(false);
     }
@@ -529,15 +520,15 @@ function ResetScreen({ onGo, resetToken, onResetSuccess }) {
     return (
       <div className="auth-wrap">
         <AuthArt caption={{
-          title: <>Enlace<br/><i>no válido.</i></>,
-          body: "Este enlace de restablecimiento no es válido. Solicite un nuevo correo de recuperación."
+          title: <>Link<br/><i>inválido.</i></>,
+          body: "Este link de redefinição não é válido. Solicite um novo e-mail de recuperação."
         }}/>
         <div className="auth-form-wrap">
           <div className="auth-form">
-            <AuthNotice tone="error">Enlace no válido o ausente.</AuthNotice>
-            <Button size="lg" onClick={() => onGo("forgot")}>Solicitar nuevo enlace <Icon.ArrowRight size={14}/></Button>
+            <AuthNotice tone="error">Link inválido ou ausente.</AuthNotice>
+            <Button size="lg" onClick={() => onGo("forgot")}>Solicitar novo link <Icon.ArrowRight size={14}/></Button>
             <div className="links" style={{ justifyContent: "center" }}>
-              <button type="button" className="link-underline" onClick={() => onGo("login")}>Volver al inicio de sesión</button>
+              <button type="button" className="link-underline" onClick={() => onGo("login")}>Voltar ao login</button>
             </div>
           </div>
         </div>
@@ -549,13 +540,13 @@ function ResetScreen({ onGo, resetToken, onResetSuccess }) {
     return (
       <div className="auth-wrap">
         <AuthArt caption={{
-          title: <>Contraseña<br/><i>actualizada.</i></>,
-          body: "Su nueva contraseña ya está activa. Úsela en el próximo inicio de sesión."
+          title: <>Senha<br/><i>atualizada.</i></>,
+          body: "Sua nova senha já está ativa. Use-a no próximo login."
         }}/>
         <div className="auth-form-wrap">
           <div className="auth-form">
-            <AuthNotice tone="success">Contraseña restablecida correctamente.</AuthNotice>
-            <Button size="lg" onClick={() => onGo("login")}>Ir al inicio de sesión <Icon.ArrowRight size={14}/></Button>
+            <AuthNotice tone="success">Senha redefinida com sucesso.</AuthNotice>
+            <Button size="lg" onClick={() => onGo("login")}>Ir para o login <Icon.ArrowRight size={14}/></Button>
           </div>
         </div>
       </div>
@@ -565,30 +556,30 @@ function ResetScreen({ onGo, resetToken, onResetSuccess }) {
   return (
     <div className="auth-wrap">
       <AuthArt caption={{
-        title: <>Defina su<br/><i>nueva contraseña.</i></>,
-        body: "Cuanto más segura sea la contraseña, más tranquila será la operación. Use mayúsculas, minúsculas, números y símbolos."
+        title: <>Defina sua<br/><i>nova senha.</i></>,
+        body: "Quanto mais forte a senha, mais tranquila fica a operação. Use maiúsculas, minúsculas, números e símbolos."
       }}/>
       <div className="auth-form-wrap">
         <form className="auth-form" onSubmit={submit}>
           <div className="heading">
-            <span className="eye">Restablecer contraseña</span>
-            <h2>Cree una nueva contraseña.</h2>
-            <p>Deberá usar esta nueva contraseña en su próximo inicio de sesión.</p>
+            <span className="eye">Redefinir senha</span>
+            <h2>Crie uma nova senha.</h2>
+            <p>Você deverá usar esta nova senha no próximo login.</p>
           </div>
           {generic ? <AuthNotice>{generic}</AuthNotice> : null}
-          <Field label="Nueva contraseña" error={err.pw}>
+          <Field label="Nova senha" error={err.pw}>
             <Input type="password" placeholder="••••••••" value={pw}
               leading={<Icon.Lock size={14}/>} onChange={(e) => setPw(e.target.value)} err={!!err.pw}/>
           </Field>
-          <Field label="Confirmar contraseña" error={err.pw2}>
+          <Field label="Confirmar senha" error={err.pw2}>
             <Input type="password" placeholder="••••••••" value={pw2}
               leading={<Icon.Lock size={14}/>} onChange={(e) => setPw2(e.target.value)} err={!!err.pw2}/>
           </Field>
           <Button type="submit" size="lg" disabled={loading}>
-            {loading ? "Guardando…" : "Restablecer contraseña"} {!loading ? <Icon.ArrowRight size={14}/> : null}
+            {loading ? "Salvando…" : "Redefinir senha"} {!loading ? <Icon.ArrowRight size={14}/> : null}
           </Button>
           <div className="links" style={{ justifyContent: "center" }}>
-            <button type="button" className="link-underline" onClick={() => onGo("login")}>Volver al inicio de sesión</button>
+            <button type="button" className="link-underline" onClick={() => onGo("login")}>Voltar ao login</button>
           </div>
         </form>
       </div>
