@@ -316,7 +316,7 @@ function TaskDetail({
       <div className="page-head">
         <div className="titles">
           <div className="row" style={{ gap: 12, alignItems: "center" }}>
-            <span className="eyebrow-sm" style={{ background: "rgba(194,164,109,0.10)", padding: "4px 10px", border: "1px solid var(--gold-30)", borderRadius: 2 }}>{task.id}</span>
+            <span className="eyebrow-sm" style={{ background: "rgba(181, 235, 12,0.10)", padding: "4px 10px", border: "1px solid var(--gold-30)", borderRadius: 2 }}>{task.id}</span>
             <StatusBadge>{task.status}</StatusBadge>
             <span className="tiny muted">Tipo: <span style={{ color: "var(--fg-3)" }}>{task.servico}</span></span>
           </div>

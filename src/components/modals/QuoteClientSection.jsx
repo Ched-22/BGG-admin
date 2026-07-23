@@ -173,7 +173,7 @@ export function QuoteClientSection({
               border: "1px solid var(--gold-30)",
               borderRadius: 4,
               padding: 14,
-              background: "rgba(194,164,109,0.06)",
+              background: "rgba(181, 235, 12,0.06)",
               display: "flex",
               alignItems: "center",
               gap: 12,

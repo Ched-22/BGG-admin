@@ -73,7 +73,7 @@ export async function buildQuotePdf(detail, options = {}) {
   layout.addBrandHeader({
     logoDataUrl,
     docTitle: strings.docTitle,
-    brandName: 'Black Gold Garage',
+    brandName: 'Black Green Garage',
     metaLines: [
       `ID: ${detail.id}`,
       `${strings.status}: ${statusLabel}`,

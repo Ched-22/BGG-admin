@@ -1,5 +1,4 @@
 import React, { useCallback, useEffect, useState } from "react";
-import { BGG_DATA } from "../data/bggData";
 import { Button, Icon, PageRefreshButton, Field, Input, Select, Textarea, Modal, formatEUR, StatusBadge, useConfirm, useToast } from "../components/ui";
 import { ExportMenu } from "../components/ExportMenu";
 import { CUSTOMERS_EXPORT_COLUMNS } from "../lib/exportColumns";
@@ -246,7 +245,7 @@ function CustomerFormFields({ form, setForm }) {
   );
 }
 
-function CustomersPage({ readOnly = false, onOpenTask, onCreateTask, initialCustomerId, onNav }) {
+function CustomersPage({ readOnly = false, tasks = [], onOpenTask, onCreateTask, initialCustomerId, onNav }) {
   const toast = useToast();
   const [confirm, ConfirmEl] = useConfirm();
   const PAGE_SIZE = 15;
@@ -656,7 +655,7 @@ function CustomersPage({ readOnly = false, onOpenTask, onCreateTask, initialCust
                     <td>
                       <div className="row" style={{ gap: 10 }}>
                         <div className="avatar" style={{
-                          background: c.status === "VIP" ? "var(--gold)" : c.status === "Inativo" ? "var(--bg-elevated)" : "rgba(194,164,109,0.18)",
+                          background: c.status === "VIP" ? "var(--gold)" : c.status === "Inativo" ? "var(--bg-elevated)" : "rgba(181, 235, 12,0.18)",
                           color: c.status === "VIP" ? "var(--gold-on)" : c.status === "Inativo" ? "var(--fg-5)" : "var(--gold)",
                           border: c.status === "VIP" ? "none" : "1px solid var(--gold-30)"
                         }}>{c.name.split(" ").pop().slice(0, 2)}</div>
@@ -724,7 +723,7 @@ function CustomersPage({ readOnly = false, onOpenTask, onCreateTask, initialCust
               <div key={c.id || c.name} className="entity-card" onClick={() => setDetail(c)}>
                 <div className="head">
                   <div className="avatar" style={{
-                    background: c.status === "VIP" ? "var(--gold)" : "rgba(194,164,109,0.18)",
+                    background: c.status === "VIP" ? "var(--gold)" : "rgba(181, 235, 12,0.18)",
                     color: c.status === "VIP" ? "var(--gold-on)" : "var(--gold)",
                     border: c.status === "VIP" ? "none" : "1px solid var(--gold-30)"
                   }}>{c.name.split(" ").pop().slice(0, 2)}</div>
@@ -960,15 +959,15 @@ function CustomersPage({ readOnly = false, onOpenTask, onCreateTask, initialCust
                     </tr>
                   </thead>
                   <tbody>
-                    {BGG_DATA.tasks.filter(t => t.cliente === detail.name).slice(0, 5).map(t => (
+                    {tasks.filter(t => t.cliente === detail.name).slice(0, 5).map(t => (
                       <tr key={t.id} onClick={() => { setDetail(null); onOpenTask(t.id); }}>
                         <td className="id">{t.id}</td>
                         <td>{t.projeto}</td>
                         <td><StatusBadge>{t.status}</StatusBadge></td>
-                        <td className="amount" style={{ textAlign: "right" }}>{formatEUR(t.orcamento.valor)}</td>
+                        <td className="amount" style={{ textAlign: "right" }}>{formatEUR(t.orcamento?.valor)}</td>
                       </tr>
                     ))}
-                    {BGG_DATA.tasks.filter(t => t.cliente === detail.name).length === 0 ? (
+                    {tasks.filter(t => t.cliente === detail.name).length === 0 ? (
                       <tr><td colSpan="4" className="muted small" style={{ textAlign: "center", padding: 24 }}>Nenhuma tarefa registrada para este cliente.</td></tr>
                     ) : null}
                   </tbody>

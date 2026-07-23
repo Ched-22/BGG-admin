@@ -206,7 +206,7 @@ export async function buildInspectionReportPdf(detail, task = {}, options = {}) 
   layout.addBrandHeader({
     logoDataUrl,
     docTitle: strings.docSubtitle,
-    brandName: 'Black Gold Garage',
+    brandName: 'Black Green Garage',
     metaLines: [
       taskId !== '—' ? `${strings.task}: ${taskId}` : null,
       `${strings.reportStatus}: ${reportStatus}`,

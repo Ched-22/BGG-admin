@@ -1,5 +1,4 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { BGG_DATA } from "./data/bggData";
 import { buildCalendarEvents } from "./lib/scheduling";
 import api from "./lib/api";
 import { useToast, useConfirm } from "./components/ui";
@@ -91,7 +90,7 @@ function App() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
   const calendarEvents = useMemo(
-    () => buildCalendarEvents(tasks, BGG_DATA.seedCalendarExtras),
+    () => buildCalendarEvents(tasks),
     [tasks]
   );
 
@@ -776,6 +775,7 @@ function App() {
         {route.page === "customers" ? (
           <CustomersPage
             readOnly={readOnly}
+            tasks={tasks}
             onOpenTask={openTask}
             onCreateTask={onCreateTask}
             initialCustomerId={route.customerId}

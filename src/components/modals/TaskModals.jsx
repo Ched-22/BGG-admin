@@ -114,7 +114,7 @@ function AssignTechModal({ open, task, technicians = [], onClose, onSave }) {
                   onClick={() => setTechName(t.name)}
                   style={{
                     border: `1px solid ${sel ? "var(--gold)" : "var(--border)"}`,
-                    background: sel ? "rgba(194,164,109,0.10)" : "var(--bg-elevated)",
+                    background: sel ? "rgba(181, 235, 12,0.10)" : "var(--bg-elevated)",
                     borderRadius: 4,
                     padding: 12,
                     textAlign: "left",
@@ -582,7 +582,7 @@ function ScheduleModal({ open, task, tasks = EMPTY_TASKS, events = [], defaultDa
                     onClick={() => setBaia(b)}
                     style={{
                       border: `1px solid ${sel ? "var(--gold)" : "var(--border)"}`,
-                      background: sel ? "rgba(194,164,109,0.10)" : "var(--bg-elevated)",
+                      background: sel ? "rgba(181, 235, 12,0.10)" : "var(--bg-elevated)",
                       borderRadius: 4,
                       padding: "12px 14px",
                       textAlign: "left",
@@ -713,7 +713,7 @@ function ScheduleModal({ open, task, tasks = EMPTY_TASKS, events = [], defaultDa
                       onClick={() => setTech(t.name)}
                       style={{
                         border: `1px solid ${selected ? "var(--gold)" : "var(--border)"}`,
-                        background: selected ? "rgba(194,164,109,0.12)" : "var(--bg-elevated)",
+                        background: selected ? "rgba(181, 235, 12,0.12)" : "var(--bg-elevated)",
                         borderRadius: 4,
                         padding: "6px 10px",
                         fontSize: 11,
@@ -1078,7 +1078,7 @@ function CreateTaskModal({ open, onClose, onCreate, prefill }) {
                   border: "1px solid var(--gold-30)",
                   borderRadius: 4,
                   padding: 14,
-                  background: "rgba(194,164,109,0.06)",
+                  background: "rgba(181, 235, 12,0.06)",
                   display: "flex",
                   alignItems: "center",
                   gap: 12,
@@ -1175,7 +1175,7 @@ function CreateTaskModal({ open, onClose, onCreate, prefill }) {
               )}
 
               {data.clientId ? (
-                <div style={{ border: "1px solid var(--gold-30)", padding: 12, borderRadius: 4, background: "rgba(194,164,109,0.06)", fontSize: 12.5, color: "var(--fg-3)", display: "flex", gap: 10, alignItems: "flex-start" }}>
+                <div style={{ border: "1px solid var(--gold-30)", padding: 12, borderRadius: 4, background: "rgba(181, 235, 12,0.06)", fontSize: 12.5, color: "var(--fg-3)", display: "flex", gap: 10, alignItems: "flex-start" }}>
                   <Icon.Info size={14} style={{ color: "var(--gold)", marginTop: 1 }}/>
                   <div>Endereço do cadastro será usado na etapa de propriedade. Você pode ajustar na próxima etapa.</div>
                 </div>
@@ -1230,7 +1230,7 @@ function CreateTaskModal({ open, onClose, onCreate, prefill }) {
       {step === 3 ? (
         <div className="col" style={{ gap: 14 }}>
           {skipAddressValidation ? (
-            <div style={{ border: "1px solid var(--gold-30)", padding: 12, borderRadius: 4, background: "rgba(194,164,109,0.06)", fontSize: 12.5, color: "var(--fg-3)", display: "flex", gap: 10, alignItems: "flex-start" }}>
+            <div style={{ border: "1px solid var(--gold-30)", padding: 12, borderRadius: 4, background: "rgba(181, 235, 12,0.06)", fontSize: 12.5, color: "var(--fg-3)", display: "flex", gap: 10, alignItems: "flex-start" }}>
               <Icon.Info size={14} style={{ color: "var(--gold)", marginTop: 1 }}/>
               <div>Cliente já cadastrado — endereço é opcional. Preencha apenas se for diferente do cadastro.</div>
             </div>
@@ -1281,7 +1281,7 @@ function CreateTaskModal({ open, onClose, onCreate, prefill }) {
               <div className="tiny muted">Fotos · vídeos · documentos · até 5 arquivos</div>
             </div>
           </Field>
-          <div style={{ border: "1px solid var(--gold-30)", background: "rgba(194,164,109,0.05)", padding: 14, borderRadius: 4 }}>
+          <div style={{ border: "1px solid var(--gold-30)", background: "rgba(181, 235, 12,0.05)", padding: 14, borderRadius: 4 }}>
             <div style={{ color: "var(--gold)", fontSize: 11, letterSpacing: "0.12em", textTransform: "uppercase", marginBottom: 8, fontWeight: 500 }}>Resumo</div>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, fontSize: 12.5 }}>
               <div><span className="muted">Projeto: </span><span style={{ color: "var(--fg)" }}>{data.projeto || "—"}</span></div>

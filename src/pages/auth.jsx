@@ -17,7 +17,7 @@ function AuthArt({ caption }) {
   return (
     <div className="auth-art">
       <div className="brand brand--image brand--auth">
-        <img src={LOGO_SVG_URL} alt="Black Gold Garage" className="brand-logo" />
+        <img src={LOGO_SVG_URL} alt="Black Green Garage" className="brand-logo" />
         <span className="sub">Admin Console</span>
       </div>
       <div className="poetic">
@@ -46,7 +46,7 @@ function AuthNotice({ children, tone = "error" }) {
   return (
     <div
       style={{
-        background: isSuccess ? "rgba(194,164,109,0.08)" : "rgba(212,24,61,0.08)",
+        background: isSuccess ? "rgba(181, 235, 12,0.08)" : "rgba(212,24,61,0.08)",
         border: isSuccess ? "1px solid var(--gold-30)" : "1px solid rgba(212,24,61,0.4)",
         padding: "10px 12px",
         borderRadius: 4,
@@ -281,7 +281,7 @@ function RegisterScreen({ onGo, onAuthed }) {
     <div className="auth-wrap">
       <AuthArt caption={{
         title: <>Junte-se à<br/><i>equipe BGG.</i></>,
-        body: "Cadastre-se como técnico para acessar tarefas e operação pelo app mobile da Black Gold Garage."
+        body: "Cadastre-se como técnico para acessar tarefas e operação pelo app mobile da Black Green Garage."
       }}/>
       <div className="auth-form-wrap">
         <form className="auth-form" onSubmit={submit}>
@@ -450,7 +450,7 @@ function ForgotScreen({ onGo }) {
                 border: "1px solid var(--gold-30)",
                 padding: 18,
                 borderRadius: 4,
-                background: "rgba(194,164,109,0.06)",
+                background: "rgba(181, 235, 12,0.06)",
                 display: "flex",
                 gap: 12,
                 alignItems: "flex-start"

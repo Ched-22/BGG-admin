@@ -13,8 +13,8 @@ export const LABEL_WIDTH = 52 * MM_TO_PT;
 export const COLORS = {
   text: '#1A1A1A',
   muted: '#6B7280',
-  gold: '#C2A46D',
-  goldDark: '#8B7348',
+  gold: '#B5EB0C',
+  goldDark: '#7A9C00',
   border: '#E5E7EB',
   surface: '#F9F7F4',
   white: '#FFFFFF',

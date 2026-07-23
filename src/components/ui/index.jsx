@@ -269,7 +269,7 @@ const LOGO_SVG_URL = `${import.meta.env.BASE_URL}bgg-logo.svg`;
 function Brand({ compact = false }) {
   return (
     <div className={`brand brand--image${compact ? " brand--compact" : ""}`}>
-      <img src={LOGO_SVG_URL} alt="Black Gold Garage" className="brand-logo" />
+      <img src={LOGO_SVG_URL} alt="Black Green Garage" className="brand-logo" />
     </div>
   );
 }

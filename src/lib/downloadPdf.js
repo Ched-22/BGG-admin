@@ -38,7 +38,7 @@ export function createPdfDocument({ title, subject }) {
     info: {
       Title: title || 'BGG Document',
       Subject: subject || '',
-      Author: 'Black Gold Garage',
+      Author: 'Black Green Garage',
       Creator: 'BGG Admin',
     },
   });
@@ -103,14 +103,14 @@ export class PdfLayout {
       .font('Helvetica-Bold')
       .fontSize(FONT.bodySmall)
       .fillColor(COLORS.white)
-      .text(this.docTitle || 'Black Gold Garage', PAGE_MARGIN, mm(1.5), {
+      .text(this.docTitle || 'Black Green Garage', PAGE_MARGIN, mm(1.5), {
         width: CONTENT_WIDTH,
         lineBreak: false,
       });
     this.y = MINI_HEADER_HEIGHT + mm(4);
   }
 
-  addBrandHeader({ logoDataUrl, docTitle, brandName = 'Black Gold Garage', metaLines = [] }) {
+  addBrandHeader({ logoDataUrl, docTitle, brandName = 'Black Green Garage', metaLines = [] }) {
     this.docTitle = docTitle || brandName;
     this.hasBrandHeader = true;
 
@@ -170,7 +170,7 @@ export class PdfLayout {
     this.addBrandHeader({
       logoDataUrl: opts.logoDataUrl,
       docTitle: opts.subtitle || opts.title,
-      brandName: opts.title || 'Black Gold Garage',
+      brandName: opts.title || 'Black Green Garage',
       metaLines: opts.metaLines || [],
     });
   }

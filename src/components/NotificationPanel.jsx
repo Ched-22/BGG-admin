@@ -89,7 +89,7 @@ export function NotificationPanel({ open, onClose, onAction, onUnreadChange }) {
               padding: 12,
               borderRadius: 'var(--radius)',
               border: '1px solid var(--border)',
-              background: item.readAt ? 'transparent' : 'rgba(194,164,109,0.06)',
+              background: item.readAt ? 'transparent' : 'rgba(181, 235, 12,0.06)',
               cursor: 'pointer',
               display: 'flex',
               flexDirection: 'column',

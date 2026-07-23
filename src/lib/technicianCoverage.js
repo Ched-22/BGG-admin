@@ -1,7 +1,7 @@
 export const SERVICE_CATEGORY_COLORS = {
-  EXTERIOR: '#8fbf6a',
-  INTERIOR: '#6a9fbf',
-  COMPLETE: '#c2a46d',
+  EXTERIOR: '#5B9BD5',
+  INTERIOR: '#E0A458',
+  COMPLETE: '#B5EB0C',
   MOTO: '#c46aef',
 };
 

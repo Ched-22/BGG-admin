@@ -101,7 +101,7 @@ function QuoteDetailView({ detail }) {
         </div>
       ) : null}
 
-      <div className="row" style={{ gap: 8, padding: "12px 14px", background: "rgba(194,164,109,0.06)", border: "1px solid var(--gold-30)", borderRadius: 4 }}>
+      <div className="row" style={{ gap: 8, padding: "12px 14px", background: "rgba(181, 235, 12,0.06)", border: "1px solid var(--gold-30)", borderRadius: 4 }}>
         <Icon.Info size={14} style={{ color: "var(--gold)" }}/>
         <span style={{ fontSize: 12.5, color: "var(--fg-3)" }}>
           {isQuoteDraft(detail)
