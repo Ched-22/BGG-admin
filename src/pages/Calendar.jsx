@@ -21,7 +21,7 @@ function serviceClass(s) {
   return "";
 }
 
-function CalendarPage({ readOnly = false, onOpenTask, events = [], tasks = [], technicians = [], onSaveSchedule, onRefresh }) {
+function CalendarPage({ readOnly = false, onOpenTask, events = [], tasks = [], technicians = [], onSaveSchedule, onCreateTask, onRefresh }) {
   const now = new Date();
   const [cursor, setCursor] = useState({ y: now.getFullYear(), m: now.getMonth() });
   const [view, setView] = useState("month"); // month | week | day
@@ -376,6 +376,10 @@ function CalendarPage({ readOnly = false, onOpenTask, events = [], tasks = [], t
         defaultDate={selectedDate}
         onClose={() => setShowCreate(false)}
         onSave={onSaveSchedule}
+        onCreateNewTask={onCreateTask ? (date) => {
+          setShowCreate(false);
+          onCreateTask(date);
+        } : undefined}
       />
     </>
   );

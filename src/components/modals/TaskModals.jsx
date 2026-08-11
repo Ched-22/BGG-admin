@@ -217,7 +217,7 @@ function AssignTechModal({ open, task, technicians = [], onClose, onSave }) {
 }
 
 // ----- Schedule Task -----
-function ScheduleModal({ open, task, tasks = EMPTY_TASKS, events = [], defaultDate = "", technicians = [], onClose, onSave }) {
+function ScheduleModal({ open, task, tasks = EMPTY_TASKS, events = [], defaultDate = "", technicians = [], onClose, onSave, onCreateNewTask }) {
   const [pickedTaskId, setPickedTaskId] = useState("");
   const [dropoffDate, setDropoffDate] = useState("");
   const [dropoffTime, setDropoffTime] = useState("");
@@ -673,6 +673,18 @@ function ScheduleModal({ open, task, tasks = EMPTY_TASKS, events = [], defaultDa
                   <option key={t.id} value={t.id}>{t.id} — {t.projeto} · {t.cliente}</option>
                 ))}
               </Select>
+              {onCreateNewTask ? (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  icon={Icon.Plus}
+                  style={{ marginTop: 8 }}
+                  onClick={() => onCreateNewTask(date || defaultDate)}
+                >
+                  Criar nova tarefa
+                </Button>
+              ) : null}
             </Field>
           ) : null}
 

@@ -84,6 +84,7 @@ function App() {
   const [scheduleFor, setScheduleFor] = useState(null);
   const [showCreate, setShowCreate] = useState(false);
   const [createTaskPrefill, setCreateTaskPrefill] = useState(null);
+  const [createTaskFromCalendar, setCreateTaskFromCalendar] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
   const [unreadNotifCount, setUnreadNotifCount] = useState(0);
   const [confirm, ConfirmEl] = useConfirm();
@@ -350,9 +351,15 @@ function App() {
     setCreateTaskPrefill(prefill || null);
     setShowCreate(true);
   };
+  const onCreateTaskFromCalendar = (defaultDate) => {
+    setCreateTaskPrefill(defaultDate ? { data: defaultDate } : null);
+    setCreateTaskFromCalendar(true);
+    setShowCreate(true);
+  };
   const closeCreateTask = () => {
     setShowCreate(false);
     setCreateTaskPrefill(null);
+    setCreateTaskFromCalendar(false);
   };
 
   const saveAssign = async (id, techName) => {
@@ -645,8 +652,13 @@ function App() {
   const onCreate = async (data) => {
     const created = await createTask(mapCreateTaskToApi(data));
     setTasks((cur) => [created, ...cur]);
-    setRoute({ page: "tasks" });
     toast({ kind: "success", title: "Tarefa criada com sucesso", desc: created.projeto });
+    if (createTaskFromCalendar) {
+      setCreateTaskFromCalendar(false);
+      setScheduleFor(created.id);
+    } else {
+      setRoute({ page: "tasks" });
+    }
   };
 
   // ----- auth handlers -----
@@ -768,6 +780,7 @@ function App() {
             tasks={tasks}
             technicians={technicians}
             onSaveSchedule={saveSchedule}
+            onCreateTask={onCreateTaskFromCalendar}
             onRefresh={refreshTasks}
           />
         ) : null}
