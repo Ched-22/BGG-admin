@@ -36,6 +36,8 @@ import { ClientLanguageSelect } from "../ClientLanguageSelect";
 import { DEFAULT_PHONE_COUNTRY_CODE } from "../../lib/phoneCountries";
 import { formatPhoneDisplay } from "../../lib/phoneUtils";
 import { DEFAULT_CLIENT_LANGUAGE, resolveClientPreferredLanguage } from "../../lib/clientLanguage";
+import { carBrandOptions } from "../../data/orcamentoCatalog";
+import { formatPlateInput, getPlateCountryOptions, getPlatePlaceholder, isValidPlate, plateValidationMessage } from "../../lib/plateUtils";
 
 const PT_MONTHS_SHORT = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
 const EMPTY_TASKS = [];
@@ -804,6 +806,7 @@ const EMPTY_CREATE_TASK_DATA = {
   clienteExistente: false, clientId: undefined, cliente: "", clienteEmail: "",
   clienteTelCountryCode: DEFAULT_PHONE_COUNTRY_CODE, clienteTelNationalNumber: "",
   clientePreferredLanguage: DEFAULT_CLIENT_LANGUAGE,
+  plate: "", plateCountry: "ES", brand: "", model: "", year: String(new Date().getFullYear()),
   unidade: "", logradouro: "", cidade: "", estado: "", cep: "", anotPropriedade: "",
   data: "", horario: "",
 };
@@ -888,42 +891,36 @@ function CreateTaskModal({ open, onClose, onCreate, prefill }) {
     setClientResults([]);
   };
 
-  const skipAddressValidation = !!data.clientId;
-
   const buildErrors = (throughStep = 4) => {
     const e = {};
 
     if (throughStep >= 1) {
       if (!data.projeto?.trim()) e.projeto = "Título é obrigatório.";
       else if (data.projeto.length > 100) e.projeto = "O título do projeto não deve exceder 100 caracteres.";
-      if (!data.servico) e.servico = "O tipo de serviço é obrigatório.";
-      if (!data.descricao?.trim()) e.descricao = "A descrição da tarefa é obrigatória.";
-      else if (data.descricao.length > 1000) e.descricao = "A descrição da tarefa não deve exceder 1.000 caracteres.";
+      if (data.descricao && data.descricao.length > 1000) e.descricao = "A descrição da tarefa não deve exceder 1.000 caracteres.";
     }
 
     if (throughStep >= 2) {
       if (data.clienteExistente) {
         if (!data.clientId) e.cliente = "Busque e selecione um cliente da lista.";
-      } else if (!data.cliente?.trim()) {
-        e.cliente = "O nome do cliente é obrigatório.";
-      } else if (data.cliente.length > 100) {
-        e.cliente = "O nome do cliente não deve exceder 100 caracteres.";
+      } else {
+        if (!data.cliente?.trim()) e.cliente = "O nome do cliente é obrigatório.";
+        else if (data.cliente.length > 100) e.cliente = "O nome do cliente não deve exceder 100 caracteres.";
+        if (!data.clienteTelNationalNumber?.trim()) e.clienteTelefone = "O telefone é obrigatório.";
+        if (!data.clienteEmail?.trim()) e.clienteEmail = "O e-mail é obrigatório.";
       }
       if (data.clienteEmail && !/^\S+@\S+\.\S+$/.test(data.clienteEmail)) {
         e.clienteEmail = "Digite um endereço de e-mail válido.";
       }
     }
 
-    if (throughStep >= 3 && !skipAddressValidation) {
-      if (!data.unidade?.trim()) e.unidade = "Unidade, apartamento ou sala é obrigatório.";
-      if (!data.cidade?.trim()) e.cidade = "Cidade é obrigatória.";
-      if (!data.estado?.trim()) e.estado = "Estado é obrigatório.";
-      if (!data.cep?.trim()) e.cep = "Código postal é obrigatório.";
-    }
-
-    if (throughStep >= 4) {
-      if (!data.data) e.data = "A data de agendamento é obrigatória.";
-      if (!data.horario) e.horario = "O horário é obrigatório.";
+    if (throughStep >= 3) {
+      if (!data.plate?.trim()) e.plate = "A placa é obrigatória.";
+      else if (!isValidPlate(data.plate, data.plateCountry)) e.plate = plateValidationMessage(data.plateCountry);
+      if (!data.brand?.trim()) e.brand = "A marca é obrigatória.";
+      if (!data.model?.trim()) e.model = "O modelo é obrigatório.";
+      const year = Number(data.year);
+      if (!data.year || Number.isNaN(year)) e.year = "Ano inválido.";
     }
 
     return e;
@@ -931,13 +928,11 @@ function CreateTaskModal({ open, onClose, onCreate, prefill }) {
 
   const firstErrorStep = (e) => {
     const byStep = [
-      ["projeto", "servico", "descricao"],
-      ["cliente", "clienteEmail"],
-      ["unidade", "cidade", "estado", "cep"],
-      ["data", "horario"],
+      ["projeto", "descricao"],
+      ["cliente", "clienteTelefone", "clienteEmail"],
+      ["plate", "brand", "model", "year"],
     ];
     for (let i = 0; i < byStep.length; i += 1) {
-      if (i === 2 && skipAddressValidation) continue;
       if (byStep[i].some((field) => e[field])) return i + 1;
     }
     return 1;
@@ -954,11 +949,11 @@ function CreateTaskModal({ open, onClose, onCreate, prefill }) {
       });
       return;
     }
-    setStep((s) => Math.min(4, s + 1));
+    setStep((s) => Math.min(5, s + 1));
   };
 
   const submit = async () => {
-    const e = buildErrors(4);
+    const e = buildErrors(5);
     setErr(e);
     if (Object.keys(e).length > 0) {
       const errorStep = firstErrorStep(e);
@@ -995,14 +990,14 @@ function CreateTaskModal({ open, onClose, onCreate, prefill }) {
       footer={
         <>
           <Button variant="ghost" onClick={onClose}>Cancelar</Button>
-          {step < 4 ? <Button onClick={goNext}>Continuar <Icon.ArrowRight size={14}/></Button> : null}
-          {step === 4 ? <Button icon={Icon.Plus} onClick={submit}>Criar Tarefa</Button> : null}
+          {step < 5 ? <Button onClick={goNext}>Continuar <Icon.ArrowRight size={14}/></Button> : null}
+          {step === 5 ? <Button icon={Icon.Plus} onClick={submit}>Criar Tarefa</Button> : null}
         </>
       }
     >
       {/* Stepper */}
       <div className="sheet-tabs">
-        {["Detalhes da Tarefa", "Cliente", "Propriedade", "Agenda &amp; Anexos"].map((s, i) => (
+        {["Detalhes da Tarefa", "Cliente", "Veículo", "Propriedade", "Agenda &amp; Anexos"].map((s, i) => (
           <button
             key={i}
             className={step === i + 1 ? "active" : ""}
@@ -1019,13 +1014,13 @@ function CreateTaskModal({ open, onClose, onCreate, prefill }) {
           <Field label="Título do Projeto" error={err.projeto}>
             <Input value={data.projeto} onChange={(e) => set("projeto", e.target.value)} placeholder="Ex: Vitrificação Carbon Pro — Coupé" err={!!err.projeto} maxLength={100}/>
           </Field>
-          <Field label="Tipo de Serviço" error={err.servico}>
+          <Field label="Tipo de Serviço" optional error={err.servico}>
             <Select value={data.servico} onChange={(e) => set("servico", e.target.value)} err={!!err.servico}>
               <option value="">Selecione um tipo</option>
               {BGG_DATA.serviceTypes.map(s => <option key={s} value={s}>{s}</option>)}
             </Select>
           </Field>
-          <Field label="Descrição da Tarefa" error={err.descricao} hint={`${data.descricao.length}/1.000 caracteres`}>
+          <Field label="Descrição da Tarefa" optional error={err.descricao} hint={`${data.descricao.length}/1.000 caracteres`}>
             <Textarea value={data.descricao} onChange={(e) => set("descricao", e.target.value)} placeholder="O que será feito, condição atual do veículo, expectativas do cliente…" err={!!err.descricao} maxLength={1000} style={{ minHeight: 120 }}/>
           </Field>
           <Field label="Anotações Internas" optional hint={`${data.anotInternas.length}/1.000 caracteres`}>
@@ -1204,7 +1199,7 @@ function CreateTaskModal({ open, onClose, onCreate, prefill }) {
                   maxLength={100}
                 />
               </Field>
-              <Field label="Telefone" optional>
+              <Field label="Telefone" error={err.clienteTelefone}>
                 <PhoneInput
                   countryCode={data.clienteTelCountryCode}
                   nationalNumber={data.clienteTelNationalNumber}
@@ -1217,7 +1212,7 @@ function CreateTaskModal({ open, onClose, onCreate, prefill }) {
                   }
                 />
               </Field>
-              <Field label="E-mail" optional error={err.clienteEmail}>
+              <Field label="E-mail" error={err.clienteEmail}>
                 <Input
                   type="email"
                   value={data.clienteEmail}
@@ -1241,13 +1236,49 @@ function CreateTaskModal({ open, onClose, onCreate, prefill }) {
 
       {step === 3 ? (
         <div className="col" style={{ gap: 14 }}>
-          {skipAddressValidation ? (
-            <div style={{ border: "1px solid var(--gold-30)", padding: 12, borderRadius: 4, background: "rgba(181, 235, 12,0.06)", fontSize: 12.5, color: "var(--fg-3)", display: "flex", gap: 10, alignItems: "flex-start" }}>
-              <Icon.Info size={14} style={{ color: "var(--gold)", marginTop: 1 }}/>
-              <div>Cliente já cadastrado — endereço é opcional. Preencha apenas se for diferente do cadastro.</div>
-            </div>
-          ) : null}
-          <Field label="Unidade / Apartamento / Sala" optional={skipAddressValidation} error={err.unidade}>
+          <Field label="País de origem">
+            <select
+              className="input"
+              value={data.plateCountry || "ES"}
+              onChange={(e) => setData((d) => ({ ...d, plateCountry: e.target.value, plate: "" }))}
+            >
+              {getPlateCountryOptions().map((opt) => (
+                <option key={opt.code} value={opt.code}>{opt.label}</option>
+              ))}
+            </select>
+          </Field>
+          <Field label="Placa / Matrícula" error={err.plate}>
+            <Input
+              placeholder={getPlatePlaceholder(data.plateCountry)}
+              value={data.plate}
+              onChange={(e) => set("plate", formatPlateInput(e.target.value, data.plateCountry))}
+              err={!!err.plate}
+            />
+          </Field>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+            <Field label="Marca" error={err.brand}>
+              <Select value={data.brand} onChange={(e) => set("brand", e.target.value)} err={!!err.brand}>
+                <option value="">Selecione a marca</option>
+                {carBrandOptions(data.brand).map((b) => <option key={b} value={b}>{b}</option>)}
+              </Select>
+            </Field>
+            <Field label="Modelo" error={err.model}>
+              <Input value={data.model} onChange={(e) => set("model", e.target.value)} err={!!err.model}/>
+            </Field>
+          </div>
+          <Field label="Ano" error={err.year}>
+            <Input type="number" value={data.year} onChange={(e) => set("year", e.target.value)} err={!!err.year}/>
+          </Field>
+        </div>
+      ) : null}
+
+      {step === 4 ? (
+        <div className="col" style={{ gap: 14 }}>
+          <div style={{ border: "1px solid var(--gold-30)", padding: 12, borderRadius: 4, background: "rgba(181, 235, 12,0.06)", fontSize: 12.5, color: "var(--fg-3)", display: "flex", gap: 10, alignItems: "flex-start" }}>
+            <Icon.Info size={14} style={{ color: "var(--gold)", marginTop: 1 }}/>
+            <div>Etapa opcional. Preencha apenas se já tiver o endereço no momento do agendamento.</div>
+          </div>
+          <Field label="Unidade / Apartamento / Sala" optional error={err.unidade}>
             <Input value={data.unidade} onChange={(e) => set("unidade", e.target.value)} placeholder="Ex: Apto 1402, Torre B" err={!!err.unidade}/>
           </Field>
           <AddressLocationFields
@@ -1255,7 +1286,7 @@ function CreateTaskModal({ open, onClose, onCreate, prefill }) {
             cidade={data.cidade}
             estado={data.estado}
             cep={data.cep}
-            optional={skipAddressValidation}
+            optional
             cidadeError={err.cidade}
             estadoError={err.estado}
             cepError={err.cep}
@@ -1269,13 +1300,13 @@ function CreateTaskModal({ open, onClose, onCreate, prefill }) {
         </div>
       ) : null}
 
-      {step === 4 ? (
+      {step === 5 ? (
         <div className="col" style={{ gap: 14 }}>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-            <Field label="Data" error={err.data}>
+            <Field label="Data" optional error={err.data}>
               <Input type="date" value={data.data} onChange={(e) => set("data", e.target.value)} err={!!err.data}/>
             </Field>
-            <Field label="Horário" error={err.horario}>
+            <Field label="Horário" optional error={err.horario}>
               <Input type="time" value={data.horario} onChange={(e) => set("horario", e.target.value)} err={!!err.horario}/>
             </Field>
           </div>
@@ -1299,6 +1330,7 @@ function CreateTaskModal({ open, onClose, onCreate, prefill }) {
               <div><span className="muted">Projeto: </span><span style={{ color: "var(--fg)" }}>{data.projeto || "—"}</span></div>
               <div><span className="muted">Serviço: </span><span style={{ color: "var(--fg)" }}>{data.servico || "—"}</span></div>
               <div><span className="muted">Cliente: </span><span style={{ color: "var(--fg)" }}>{data.cliente || "—"}</span></div>
+              <div><span className="muted">Veículo: </span><span style={{ color: "var(--fg)" }}>{data.brand ? `${data.brand} ${data.model} · ${data.plate}` : "—"}</span></div>
               <div><span className="muted">Endereço: </span><span style={{ color: "var(--fg)" }}>{data.cidade ? `${data.cidade}/${data.estado}` : "—"}</span></div>
               <div><span className="muted">Quando: </span><span className="mono" style={{ color: "var(--gold)" }}>{data.data || "—"} · {data.horario || "—"}</span></div>
             </div>

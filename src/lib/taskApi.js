@@ -178,6 +178,11 @@ export function mapCreateTaskToApi(data) {
       ? String(data.clienteTelNationalNumber).replace(/\D/g, '')
       : undefined,
     clientId: data.clientId || undefined,
+    plate: data.plate?.trim() || '',
+    plateCountry: data.plateCountry || 'ES',
+    brand: data.brand?.trim() || '',
+    model: data.model?.trim() || '',
+    year: Number(data.year) || new Date().getFullYear(),
     addressUnit: data.unidade?.trim() || '',
     street: data.logradouro?.trim() || undefined,
     city: data.cidade?.trim() || '',
