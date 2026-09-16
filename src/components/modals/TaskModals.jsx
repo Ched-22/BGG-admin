@@ -1,28 +1,53 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { BGG_DATA } from "../../data/bggData";
-import { Button, Icon, Field, Input, Select, Textarea, Checkbox, Modal, useToast } from "../ui";
+import { Button, Icon, Field, Input, Select, Textarea, Checkbox, Modal, useToast, formatEUR } from "../ui";
+import { AddressLocationFields } from "../AddressLocationFields";
+import { TimeInput24 } from "../TimeInput24";
+import { mapClientToTaskPrefill, searchClients } from "../../lib/clientApi";
 import {
   BAIAS,
   DURATION_HOUR_OPTIONS,
   DURATION_OTHER,
-  findBayConflict,
   formatDurationHours,
-  getBlockedTimeSlots,
-  endsAfterClosing,
+  buildMonthDays,
+  formatISODate,
+  todayISO,
   isPresetDurationHours,
-  minutesToTime,
-  parseTimeToMinutes,
+  isLongDurationHours,
   resolveDurationHours,
+  SCHEDULE_TIME_SLOTS,
+  normalizeTime24,
+  filterTechniciansForScheduleDate,
+  isServiceDateAvailableForTechnician,
+  countEligibleTechniciansOnDate,
 } from "../../lib/scheduling";
+import {
+  buildWhatsAppMessage,
+  formatAddressForWhatsApp,
+  formatDateBR,
+  normalizeWhatsAppPhone,
+  notifyWhatsAppResult,
+  openWhatsAppClient,
+} from "../../lib/whatsapp";
+import { mapTechniciansForPicker } from "../../lib/technicianApi";
+import { technicianCoversTaskServices, technicianCoverageHint } from "../../lib/taskServiceMatch";
+import { PhoneInput } from "../PhoneInput";
+import { ClientLanguageSelect } from "../ClientLanguageSelect";
+import { DEFAULT_PHONE_COUNTRY_CODE } from "../../lib/phoneCountries";
+import { formatPhoneDisplay } from "../../lib/phoneUtils";
+import { DEFAULT_CLIENT_LANGUAGE, resolveClientPreferredLanguage } from "../../lib/clientLanguage";
+
+const PT_MONTHS_SHORT = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
+const EMPTY_TASKS = [];
 
 // ----- Assign Technician -----
-function AssignTechModal({ open, task, onClose, onSave }) {
+function AssignTechModal({ open, task, technicians = [], onClose, onSave }) {
   const [techName, setTechName] = useState("");
   const [notes, setNotes] = useState("");
   const [notify, setNotify] = useState(true);
   const [err, setErr] = useState({});
   const toast = useToast();
-  const techs = BGG_DATA.techs;
+  const techs = useMemo(() => mapTechniciansForPicker(technicians), [technicians]);
   const selected = techs.find(t => t.name === techName);
 
   useEffect(() => {
@@ -33,21 +58,28 @@ function AssignTechModal({ open, task, onClose, onSave }) {
     }
   }, [open, task]);
 
-  const submit = () => {
+  const submit = async () => {
     const next = {};
     if (!techName) next.tech = "Técnico é obrigatório.";
     if (notes.length > 500) next.notes = "As anotações de designação não devem exceder 500 caracteres.";
     if (selected && !selected.disponivel) next.tech = "O técnico selecionado não está disponível para esta tarefa.";
     if (selected && selected.conflito) next.tech = "O técnico selecionado tem um conflito de agenda. Por favor, selecione outro técnico.";
+    if (selected && task && !technicianCoversTaskServices(selected, task)) {
+      next.tech = technicianCoverageHint(selected, task);
+    }
     setErr(next);
     if (Object.keys(next).length) return;
-    onSave(task.id, techName);
-    toast({
-      kind: "success",
-      title: notify ? "Técnico designado e notificado" : "Técnico designado",
-      desc: `${techName} foi designado para ${task.id}.`,
-    });
-    onClose();
+    try {
+      await onSave(task.id, techName);
+      toast({
+        kind: "success",
+        title: notify ? "Técnico designado e notificado" : "Técnico designado",
+        desc: `${techName} foi designado para ${task.id}.`,
+      });
+      onClose();
+    } catch {
+      /* erro exibido pelo App */
+    }
   };
 
   if (!open || !task) return null;
@@ -74,22 +106,25 @@ function AssignTechModal({ open, task, onClose, onSave }) {
               const sel = techName === t.name;
               const dim = !t.disponivel;
               const conf = t.conflito;
+              const lacksCoverage = task && !technicianCoversTaskServices(t, task);
+              const blocked = dim || lacksCoverage;
               return (
                 <button
                   key={t.name}
                   onClick={() => setTechName(t.name)}
                   style={{
                     border: `1px solid ${sel ? "var(--gold)" : "var(--border)"}`,
-                    background: sel ? "rgba(194,164,109,0.10)" : "var(--bg-elevated)",
+                    background: sel ? "rgba(181, 235, 12,0.10)" : "var(--bg-elevated)",
                     borderRadius: 4,
                     padding: 12,
                     textAlign: "left",
-                    opacity: dim ? 0.5 : 1,
-                    cursor: dim ? "not-allowed" : "pointer",
+                    opacity: blocked ? 0.5 : 1,
+                    cursor: blocked ? "not-allowed" : "pointer",
                     display: "flex", gap: 10, alignItems: "flex-start",
                     transition: "all 200ms var(--ease-out)",
                   }}
-                  disabled={dim}
+                  disabled={blocked}
+                  title={lacksCoverage ? technicianCoverageHint(t, task) : undefined}
                 >
                   <div className="avatar sm tech" style={{ background: sel ? "var(--gold)" : "var(--bg-elevated)", color: sel ? "var(--gold-on)" : "var(--fg)" }}>
                     {t.name.split(" ").pop()}
@@ -101,7 +136,9 @@ function AssignTechModal({ open, task, onClose, onSave }) {
                         dim ? <span className="badge muted" style={{ fontSize: 9, padding: "2px 5px" }}>Indisponível</span> :
                         <span className="badge success" style={{ fontSize: 9, padding: "2px 5px" }}>Disponível</span>}
                     </div>
-                    <div className="tiny muted" style={{ marginTop: 3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{t.skills.join(" · ")}</div>
+                    <div className="tiny muted" style={{ marginTop: 3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      {(t.services?.length ? t.services.map((s) => s.name) : t.skills).join(" · ")}
+                    </div>
                     <div className="tiny muted" style={{ marginTop: 2 }}>{t.agenda} · {t.carga} tarefas</div>
                   </div>
                 </button>
@@ -114,7 +151,9 @@ function AssignTechModal({ open, task, onClose, onSave }) {
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
             <Field label="Habilidades">
               <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
-                {selected.skills.map(s => <span key={s} className="tag">{s}</span>)}
+                {(selected.services?.length ? selected.services.map((s) => s.name) : selected.skills).map((s) => (
+                  <span key={s} className="tag">{s}</span>
+                ))}
               </div>
             </Field>
             <Field label="Agenda">
@@ -178,9 +217,15 @@ function AssignTechModal({ open, task, onClose, onSave }) {
 }
 
 // ----- Schedule Task -----
-function ScheduleModal({ open, task, tasks = [], events = [], defaultDate = "", onClose, onSave }) {
+function ScheduleModal({ open, task, tasks = EMPTY_TASKS, events = [], defaultDate = "", technicians = [], onClose, onSave, onCreateNewTask }) {
   const [pickedTaskId, setPickedTaskId] = useState("");
+  const [dropoffDate, setDropoffDate] = useState("");
+  const [dropoffTime, setDropoffTime] = useState("");
   const [date, setDate] = useState("");
+  const [calCursor, setCalCursor] = useState(() => {
+    const now = new Date();
+    return { y: now.getFullYear(), m: now.getMonth() };
+  });
   const [time, setTime] = useState("");
   const [tech, setTech] = useState("");
   const [baia, setBaia] = useState(1);
@@ -188,10 +233,12 @@ function ScheduleModal({ open, task, tasks = [], events = [], defaultDate = "", 
   const [duracaoHoras, setDuracaoHoras] = useState(2);
   const [customDuracaoHoras, setCustomDuracaoHoras] = useState("");
   const [notes, setNotes] = useState("");
-  const [notifyCli, setNotifyCli] = useState(true);
   const [notifyTec, setNotifyTec] = useState(true);
+  const [saved, setSaved] = useState(false);
   const [err, setErr] = useState({});
   const toast = useToast();
+  const scheduleInitKeyRef = useRef("");
+  const techOptions = useMemo(() => mapTechniciansForPicker(technicians), [technicians]);
 
   const activeTask = task || tasks.find((t) => t.id === pickedTaskId) || null;
   const schedulableTasks = tasks.filter(
@@ -212,57 +259,153 @@ function ScheduleModal({ open, task, tasks = [], events = [], defaultDate = "", 
   };
 
   useEffect(() => {
-    if (!open) return;
+    if (!open) {
+      scheduleInitKeyRef.current = "";
+      return;
+    }
+    const initKey = `${task?.id ?? ""}|${pickedTaskId}|${defaultDate}`;
+    if (scheduleInitKeyRef.current === initKey) return;
+    scheduleInitKeyRef.current = initKey;
+
     const source = task || tasks.find((t) => t.id === pickedTaskId);
+    const initialServiceDate = source?.dataAgendada || defaultDate || todayISO();
+    const initialDropoffDate = source?.clientDropoffDate || source?.dataAgendada || defaultDate || todayISO();
     if (source) {
-      setDate(source.dataAgendada || defaultDate || "2026-05-22");
+      setDropoffDate(initialDropoffDate);
+      setDropoffTime(normalizeTime24(source.clientDropoffTime || source.horario || "") || source.clientDropoffTime || source.horario || "");
+      setDate(initialServiceDate);
       setTime(source.horario || "");
       setTech(source.tecnico || "");
       setBaia(source.baia || 1);
       applyDuration(source.duracaoHoras);
     } else {
       setPickedTaskId("");
-      setDate(defaultDate || "2026-05-22");
+      setDropoffDate(initialDropoffDate);
+      setDropoffTime("");
+      setDate(initialServiceDate);
       setTime("");
       setTech("");
       setBaia(1);
       applyDuration(2);
     }
+    const initialDay = new Date(`${initialServiceDate}T00:00:00`);
+    setCalCursor({ y: initialDay.getFullYear(), m: initialDay.getMonth() });
     setNotes("");
+    setSaved(false);
     setErr({});
   }, [open, task, pickedTaskId, defaultDate, tasks]);
 
-  const times = ["08:00","08:30","09:00","09:30","10:00","10:30","11:00","11:30","13:00","13:30","14:00","14:30","15:00","15:30","16:00","16:30","17:00","17:30"];
+  const times = SCHEDULE_TIME_SLOTS;
   const activeTaskId = activeTask?.id;
   const effectiveDuracaoHoras = resolveDurationHours({ durationMode, duracaoHoras, customDuracaoHoras });
-  const blockedTimes = useMemo(
-    () => (activeTaskId && date && effectiveDuracaoHoras > 0
-      ? getBlockedTimeSlots(events, { data: date, duracaoHoras: effectiveDuracaoHoras, baia, excludeId: activeTaskId }, times)
-      : []),
-    [events, date, effectiveDuracaoHoras, baia, activeTaskId]
+  const scheduleSlotContext = useMemo(() => ({
+    duracaoHoras: effectiveDuracaoHoras,
+    baia,
+    excludeId: activeTaskId,
+  }), [effectiveDuracaoHoras, baia, activeTaskId]);
+
+  const eligibleTechOptions = useMemo(
+    () => filterTechniciansForScheduleDate(
+      techOptions,
+      activeTask,
+      events,
+      { ...scheduleSlotContext, date: "", coversTask: technicianCoversTaskServices },
+    ),
+    [techOptions, activeTask, events, scheduleSlotContext],
   );
-  const conflictAtSelection = activeTaskId && date && time && baia && effectiveDuracaoHoras > 0
-    ? findBayConflict(events, { data: date, horario: time, duracaoHoras: effectiveDuracaoHoras, baia }, activeTaskId)
-    : null;
+
+  const availableTechOptions = useMemo(
+    () => filterTechniciansForScheduleDate(
+      techOptions,
+      activeTask,
+      events,
+      { ...scheduleSlotContext, date, coversTask: technicianCoversTaskServices },
+    ),
+    [techOptions, activeTask, events, scheduleSlotContext, date],
+  );
+
+  const isDaySelectable = useCallback((iso, inMonth) => {
+    if (!inMonth) return false;
+    if (iso < todayISO()) return false;
+    if (!effectiveDuracaoHoras || !baia) return true;
+    if (tech) {
+      return isServiceDateAvailableForTechnician(
+        events,
+        { date: iso, tecnico: tech, ...scheduleSlotContext },
+        times,
+      );
+    }
+    return countEligibleTechniciansOnDate(
+      techOptions,
+      activeTask,
+      events,
+      { ...scheduleSlotContext, date: iso, coversTask: technicianCoversTaskServices },
+      times,
+    ) > 0;
+  }, [tech, effectiveDuracaoHoras, baia, events, scheduleSlotContext, times, techOptions, activeTask]);
+
+  const techPickerOptions = date ? availableTechOptions : eligibleTechOptions;
+
+  useEffect(() => {
+    if (!open || !date || !tech) return;
+    if (!availableTechOptions.some((t) => t.name === tech)) {
+      setTech("");
+      setTime("");
+    }
+  }, [open, date, tech, availableTechOptions]);
+
+  useEffect(() => {
+    if (!open || !date || !tech) return;
+    if (!isServiceDateAvailableForTechnician(
+      events,
+      { date, tecnico: tech, ...scheduleSlotContext },
+      times,
+    )) {
+      setDate("");
+      setTime("");
+    }
+  }, [open, tech, events, scheduleSlotContext, times, date]);
+
+  const clientPhone = activeTask ? {
+    countryCode: activeTask.clienteTelCountryCode,
+    nationalNumber: activeTask.clienteTelNationalNumber,
+  } : null;
+
+  const sendWhatsAppToClient = () => {
+    if (!activeTask) return;
+    const message = buildWhatsAppMessage("schedule_confirm", {
+      clientName: activeTask.cliente,
+      date: formatDateBR(dropoffDate),
+      time: dropoffTime,
+      address: formatAddressForWhatsApp(activeTask.endereco),
+    }, resolveClientPreferredLanguage({ task: activeTask }));
+    const result = openWhatsAppClient({ phone: clientPhone, message });
+    notifyWhatsAppResult(result, toast);
+  };
+
+  const handleClose = () => {
+    setSaved(false);
+    onClose();
+  };
 
   if (!open) return null;
 
-  // Build a simple calendar grid (May 2026)
-  const month = [
-    [27, 28, 29, 30, 1, 2, 3],
-    [4, 5, 6, 7, 8, 9, 10],
-    [11, 12, 13, 14, 15, 16, 17],
-    [18, 19, 20, 21, 22, 23, 24],
-    [25, 26, 27, 28, 29, 30, 31],
-  ];
-  const todayDay = 21;
-  const selDay = parseInt(date.split("-")[2], 10);
-  const submit = () => {
+  const monthDays = buildMonthDays(calCursor.y, calCursor.m);
+  const todayStr = todayISO();
+
+  const submit = async () => {
     const next = {};
     if (!activeTask) next.task = "Selecione a tarefa a agendar.";
-    if (!date) next.date = "A data de agendamento é obrigatória.";
-    if (!time) next.time = "Horário de agendamento é obrigatório.";
+    if (!dropoffDate) next.dropoffDate = "A data de entrega é obrigatória.";
+    if (!dropoffTime) next.dropoffTime = "O horário de entrega é obrigatório.";
+    else if (!normalizeTime24(dropoffTime)) next.dropoffTime = "Use o formato 24 horas (ex: 20:00).";
+    if (!date) next.date = "A data do serviço é obrigatória.";
+    if (!time) next.time = "Horário do serviço é obrigatório.";
     if (!tech) next.tech = "Técnico é obrigatório.";
+    const selectedTech = techPickerOptions.find((t) => t.name === tech);
+    if (selectedTech && activeTask && !technicianCoversTaskServices(selectedTech, activeTask)) {
+      next.tech = technicianCoverageHint(selectedTech, activeTask);
+    }
     if (!baia) next.baia = "Selecione a baia.";
     if (durationMode === DURATION_OTHER) {
       if (!customDuracaoHoras) next.duracaoHoras = "Informe a quantidade de horas.";
@@ -272,79 +415,158 @@ function ScheduleModal({ open, task, tasks = [], events = [], defaultDate = "", 
     } else if (!effectiveDuracaoHoras || effectiveDuracaoHoras <= 0) {
       next.duracaoHoras = "Informe a duração do serviço.";
     }
-    if (effectiveDuracaoHoras > 0 && endsAfterClosing(time, effectiveDuracaoHoras)) {
-      next.time = `O serviço termina após o fechamento (${minutesToTime(parseTimeToMinutes(time) + effectiveDuracaoHoras * 60)}).`;
-    }
-    if (activeTask && effectiveDuracaoHoras > 0) {
-      const conflict = findBayConflict(events, { data: date, horario: time, duracaoHoras: effectiveDuracaoHoras, baia }, activeTask.id);
-      if (conflict) {
-        next.time = `Baia ${baia} ocupada neste horário — conflito com ${conflict.title || conflict.id}.`;
-      }
-    }
     if (notes.length > 500) next.notes = "As anotações da agenda não devem exceder 500 caracteres.";
     setErr(next);
     if (Object.keys(next).length) return;
-    onSave(activeTask.id, { dataAgendada: date, horario: time, tecnico: tech, baia, duracaoHoras: effectiveDuracaoHoras });
-    toast({
-      kind: "success",
-      title: "Tarefa agendada",
-      desc: `${activeTask.id} · ${date} ${time} · Baia ${baia} · ${formatDurationHours(effectiveDuracaoHoras)}`,
-    });
-    if (notifyCli) toast({ kind: "success", title: "Cliente notificado", desc: activeTask.cliente });
-    if (notifyTec) toast({ kind: "success", title: "Técnico notificado", desc: tech });
-    onClose();
+    try {
+      await onSave(activeTask.id, {
+        clientDropoffDate: dropoffDate,
+        clientDropoffTime: normalizeTime24(dropoffTime),
+        dataAgendada: date,
+        horario: time,
+        tecnico: tech,
+        baia,
+        duracaoHoras: effectiveDuracaoHoras,
+      });
+      toast({
+        kind: "success",
+        title: "Tarefa agendada",
+        desc: `${activeTask.id} · entrega ${dropoffDate} ${dropoffTime} · serviço ${date} ${time} · Baia ${baia}`,
+      });
+      if (notifyTec) toast({ kind: "success", title: "Técnico notificado", desc: tech });
+      setSaved(true);
+    } catch {
+      /* erro exibido pelo App */
+    }
   };
 
   const modalTitle = task ? "Agendar Tarefa" : "Novo agendamento";
   const modalSub = activeTask
     ? `${activeTask.id} · ${activeTask.projeto} · ${activeTask.cliente}`
-    : "Selecione a tarefa e defina baia, duração e horário";
+    : "Selecione a tarefa e defina entrega do cliente, baia, duração e horário do serviço";
 
   return (
     <Modal
       open={open}
-      onClose={onClose}
+      onClose={handleClose}
       title={modalTitle}
       sub={modalSub}
       size="xl"
       footer={
-        <>
-          <Button variant="ghost" onClick={onClose}>Cancelar</Button>
-          <Button icon={Icon.Calendar} onClick={submit}>Salvar agendamento</Button>
-        </>
+        saved ? (
+          <>
+            <Button variant="ghost" onClick={handleClose}>Fechar</Button>
+            <Button
+              variant="secondary"
+              icon={Icon.WhatsApp}
+              onClick={sendWhatsAppToClient}
+              disabled={!normalizeWhatsAppPhone(clientPhone)}
+              title={normalizeWhatsAppPhone(clientPhone) ? "Enviar confirmação ao cliente" : "Telefone do cliente inválido"}
+            >
+              Enviar WhatsApp ao cliente
+            </Button>
+          </>
+        ) : (
+          <>
+            <Button variant="ghost" onClick={handleClose}>Cancelar</Button>
+            <Button icon={Icon.Calendar} onClick={submit}>Salvar agendamento</Button>
+          </>
+        )
       }
     >
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
         <div className="col" style={{ gap: 16 }}>
-          <Field label="Data Agendada" error={err.date}>
+          <div>
+            <div className="tiny" style={{ color: "var(--gold)", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 10, fontWeight: 600 }}>
+              Entrega do veículo (cliente)
+            </div>
+            <div className="col" style={{ gap: 12 }}>
+              <Field label="Data de entrega" error={err.dropoffDate}>
+                <Input
+                  type="date"
+                  value={dropoffDate}
+                  onChange={(e) => setDropoffDate(e.target.value)}
+                  err={!!err.dropoffDate}
+                />
+              </Field>
+              <Field label="Hora de entrega" error={err.dropoffTime} hint="Selecione o horário em formato 24h · comunicado ao cliente (WhatsApp)">
+                <TimeInput24
+                  value={dropoffTime}
+                  onChange={setDropoffTime}
+                  err={!!err.dropoffTime}
+                />
+              </Field>
+            </div>
+          </div>
+
+          <div>
+            <div className="tiny" style={{ color: "var(--gold)", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 10, fontWeight: 600 }}>
+              Início do serviço (técnico)
+            </div>
+          </div>
+
+          <Field
+            label="Data do serviço"
+            error={err.date}
+            hint={tech && !date
+              ? "Selecione um dia com horário livre para o técnico escolhido"
+              : date && !availableTechOptions.length
+                ? "Nenhum técnico disponível nesta data — escolha outro dia"
+                : undefined}
+          >
             <div style={{ background: "var(--bg-elevated)", border: "1px solid var(--border)", padding: 12, borderRadius: 4 }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-                <button className="icon-btn" style={{ width: 24, height: 24 }}><Icon.ChevronLeft size={14}/></button>
-                <div className="serif" style={{ color: "var(--gold)", fontSize: 16, letterSpacing: "0.04em" }}>Maio · 2026</div>
-                <button className="icon-btn" style={{ width: 24, height: 24 }}><Icon.Chevron size={14}/></button>
+                <button
+                  type="button"
+                  className="icon-btn"
+                  style={{ width: 24, height: 24 }}
+                  onClick={() => {
+                    const m = calCursor.m - 1;
+                    setCalCursor(m < 0 ? { y: calCursor.y - 1, m: 11 } : { y: calCursor.y, m });
+                  }}
+                >
+                  <Icon.ChevronLeft size={14}/>
+                </button>
+                <div className="serif" style={{ color: "var(--gold)", fontSize: 16, letterSpacing: "0.04em" }}>
+                  {PT_MONTHS_SHORT[calCursor.m]} · {calCursor.y}
+                </div>
+                <button
+                  type="button"
+                  className="icon-btn"
+                  style={{ width: 24, height: 24 }}
+                  onClick={() => {
+                    const m = calCursor.m + 1;
+                    setCalCursor(m > 11 ? { y: calCursor.y + 1, m: 0 } : { y: calCursor.y, m });
+                  }}
+                >
+                  <Icon.Chevron size={14}/>
+                </button>
               </div>
               <div className="cal">
                 {["Dom","Seg","Ter","Qua","Qui","Sex","Sáb"].map(d => <div key={d} className="h">{d}</div>)}
-                {month.flat().map((d, i) => {
-                  const wkIdx = Math.floor(i / 7);
-                  const isCur = (wkIdx === 0 && d > 7) || (wkIdx >= 4 && d < 10) ? false : true;
-                  const dStr = `2026-05-${String(d).padStart(2, "0")}`;
-                  const sel = isCur && d === selDay;
-                  const today = isCur && d === todayDay;
-                  const busy = isCur && (d === 23 || d === 26);
+                {monthDays.map((d) => {
+                  const iso = formatISODate(d);
+                  const inMonth = d.getMonth() === calCursor.m;
+                  const sel = iso === date;
+                  const isToday = iso === todayStr;
+                  const selectable = isDaySelectable(iso, inMonth);
+                  const unavailable = inMonth && !selectable;
                   return (
                     <button
-                      key={i}
-                      className={`d ${!isCur ? "muted" : ""} ${sel ? "sel" : ""} ${today && !sel ? "today" : ""} ${busy ? "busy" : ""}`}
-                      onClick={() => isCur && setDate(dStr)}
-                      disabled={!isCur}
-                    >{d}</button>
+                      key={iso}
+                      type="button"
+                      className={`d ${!inMonth ? "muted" : ""} ${sel ? "sel" : ""} ${isToday && !sel ? "today" : ""} ${unavailable ? "busy" : ""}`}
+                      onClick={() => selectable && setDate(iso)}
+                      disabled={!selectable}
+                      title={unavailable ? "Sem disponibilidade" : undefined}
+                    >{d.getDate()}</button>
                   );
                 })}
               </div>
               <div className="row" style={{ marginTop: 10, gap: 14, fontSize: 10, color: "var(--fg-6)", letterSpacing: "0.08em", textTransform: "uppercase" }}>
                 <span className="row" style={{ gap: 4 }}><span style={{ width: 6, height: 6, background: "var(--gold)", borderRadius: "50%" }}></span>Hoje</span>
                 <span className="row" style={{ gap: 4 }}><span style={{ width: 6, height: 6, background: "var(--destructive)", borderRadius: "50%" }}></span>Indisponível</span>
+                {tech ? <span>· Dias livres para {tech}</span> : date ? <span>· Dias com técnico disponível</span> : null}
               </div>
             </div>
           </Field>
@@ -360,7 +582,7 @@ function ScheduleModal({ open, task, tasks = [], events = [], defaultDate = "", 
                     onClick={() => setBaia(b)}
                     style={{
                       border: `1px solid ${sel ? "var(--gold)" : "var(--border)"}`,
-                      background: sel ? "rgba(194,164,109,0.10)" : "var(--bg-elevated)",
+                      background: sel ? "rgba(181, 235, 12,0.10)" : "var(--bg-elevated)",
                       borderRadius: 4,
                       padding: "12px 14px",
                       textAlign: "left",
@@ -419,22 +641,20 @@ function ScheduleModal({ open, task, tasks = [], events = [], defaultDate = "", 
           </Field>
 
           <Field
-            label="Horário"
+            label="Horário do serviço"
             error={err.time}
-            hint={conflictAtSelection
-              ? `Baia ${baia} indisponível — conflito com ${conflictAtSelection.title || conflictAtSelection.id}`
-              : "Horários em cinza: baia ocupada ou ultrapassam 18:00"}
+            hint="Selecione o horário de início — todos os horários estão disponíveis"
           >
             <div className="time-grid">
-              {times.map(t => (
+              {times.map((t) => (
                 <button
                   key={t}
                   type="button"
                   className={`time-chip ${time === t ? "sel" : ""}`}
-                  disabled={blockedTimes.includes(t)}
                   onClick={() => setTime(t)}
-                  title={blockedTimes.includes(t) ? "Indisponível nesta baia" : undefined}
-                >{t}</button>
+                >
+                  {t}
+                </button>
               ))}
             </div>
           </Field>
@@ -453,22 +673,82 @@ function ScheduleModal({ open, task, tasks = [], events = [], defaultDate = "", 
                   <option key={t.id} value={t.id}>{t.id} — {t.projeto} · {t.cliente}</option>
                 ))}
               </Select>
+              {onCreateNewTask ? (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  icon={Icon.Plus}
+                  style={{ marginTop: 8 }}
+                  onClick={() => onCreateNewTask(date || defaultDate)}
+                >
+                  Criar nova tarefa
+                </Button>
+              ) : null}
             </Field>
           ) : null}
 
-          <Field label="Técnico Designado" error={err.tech}>
+          <Field
+            label="Técnico Designado"
+            error={err.tech}
+            hint={date
+              ? (availableTechOptions.length
+                ? `${availableTechOptions.length} técnico(s) disponível(is) em ${date}`
+                : "Nenhum técnico executa este serviço ou está livre nesta data")
+              : (tech
+                ? "Escolha a data do serviço no calendário"
+                : "Selecione a data ou o técnico — a lista filtra automaticamente")}
+          >
             <Select value={tech} onChange={(e) => setTech(e.target.value)} err={!!err.tech}>
               <option value="">Selecione um técnico</option>
-              {BGG_DATA.techs.filter(t => t.disponivel).map(t => (
-                <option key={t.name} value={t.name}>{t.name} — {t.skills.slice(0,2).join(", ")}</option>
-              ))}
+              {techPickerOptions.map((t) => {
+                const labelServices = (t.services?.length ? t.services.map((s) => s.name) : t.skills).slice(0, 2).join(", ");
+                return (
+                  <option
+                    key={t.id || t.name}
+                    value={t.name}
+                  >
+                    {t.name}
+                    {labelServices ? ` — ${labelServices}` : ""}
+                  </option>
+                );
+              })}
             </Select>
+            {date && availableTechOptions.length ? (
+              <div className="row" style={{ flexWrap: "wrap", gap: 6, marginTop: 10 }}>
+                {availableTechOptions.map((t) => {
+                  const selected = tech === t.name;
+                  return (
+                    <button
+                      key={t.id || t.name}
+                      type="button"
+                      onClick={() => setTech(t.name)}
+                      style={{
+                        border: `1px solid ${selected ? "var(--gold)" : "var(--border)"}`,
+                        background: selected ? "rgba(181, 235, 12,0.12)" : "var(--bg-elevated)",
+                        borderRadius: 4,
+                        padding: "6px 10px",
+                        fontSize: 11,
+                        color: selected ? "var(--gold)" : "var(--fg)",
+                        cursor: "pointer",
+                      }}
+                    >
+                      {t.name}
+                    </button>
+                  );
+                })}
+              </div>
+            ) : null}
           </Field>
 
           <Field label="Resumo do agendamento">
             <div style={{ background: "var(--bg-elevated)", border: "1px solid var(--gold-30)", borderRadius: 4, padding: 14 }}>
               <div className="row" style={{ justifyContent: "space-between", marginBottom: 8 }}>
-                <span className="tiny" style={{ color: "var(--fg-6)", letterSpacing: "0.1em", textTransform: "uppercase" }}>Quando</span>
+                <span className="tiny" style={{ color: "var(--fg-6)", letterSpacing: "0.1em", textTransform: "uppercase" }}>Entrega cliente</span>
+                <span className="mono" style={{ color: "var(--fg)", fontWeight: 500 }}>{dropoffDate || "—"} · {dropoffTime || "—"}</span>
+              </div>
+              <div className="row" style={{ justifyContent: "space-between", marginBottom: 8 }}>
+                <span className="tiny" style={{ color: "var(--fg-6)", letterSpacing: "0.1em", textTransform: "uppercase" }}>Serviço técnico</span>
                 <span className="mono" style={{ color: "var(--gold)", fontWeight: 500 }}>{date || "—"} · {time || "—"}</span>
               </div>
               <div className="row" style={{ justifyContent: "space-between", marginBottom: 8 }}>
@@ -505,7 +785,11 @@ function ScheduleModal({ open, task, tasks = [], events = [], defaultDate = "", 
           </Field>
 
           <div className="col" style={{ gap: 8 }}>
-            <Checkbox checked={notifyCli} onChange={setNotifyCli} label="Notificar cliente"/>
+            {saved ? (
+              <div className="muted small" style={{ padding: "8px 0" }}>
+                Agendamento salvo. Use o botão abaixo para enviar a confirmação por WhatsApp ao cliente.
+              </div>
+            ) : null}
             <Checkbox checked={notifyTec} onChange={setNotifyTec} label="Notificar técnico"/>
           </div>
         </div>
@@ -515,60 +799,188 @@ function ScheduleModal({ open, task, tasks = [], events = [], defaultDate = "", 
 }
 
 // ----- Create Task -----
-function CreateTaskModal({ open, onClose, onCreate }) {
+const EMPTY_CREATE_TASK_DATA = {
+  projeto: "", servico: "", descricao: "", anotInternas: "",
+  clienteExistente: false, clientId: undefined, cliente: "", clienteEmail: "",
+  clienteTelCountryCode: DEFAULT_PHONE_COUNTRY_CODE, clienteTelNationalNumber: "",
+  clientePreferredLanguage: DEFAULT_CLIENT_LANGUAGE,
+  unidade: "", logradouro: "", cidade: "", estado: "", cep: "", anotPropriedade: "",
+  data: "", horario: "",
+};
+
+function CreateTaskModal({ open, onClose, onCreate, prefill }) {
   const [step, setStep] = useState(1);
-  const [data, setData] = useState({
-    projeto: "", servico: "", descricao: "", anotInternas: "",
-    clienteExistente: false, cliente: "", clienteEmail: "", clienteTel: "",
-    unidade: "", cidade: "", estado: "", cep: "", anotPropriedade: "",
-    data: "", horario: "",
-  });
+  const [data, setData] = useState({ ...EMPTY_CREATE_TASK_DATA });
   const [err, setErr] = useState({});
+  const [clientSearchMode, setClientSearchMode] = useState("name");
+  const [clientSearchQuery, setClientSearchQuery] = useState("");
+  const [clientResults, setClientResults] = useState([]);
+  const [searchingClients, setSearchingClients] = useState(false);
   const toast = useToast();
+
+  const resetClientSearch = useCallback(() => {
+    setClientSearchMode("name");
+    setClientSearchQuery("");
+    setClientResults([]);
+    setSearchingClients(false);
+  }, []);
 
   useEffect(() => {
     if (open) {
       setStep(1);
-      setData({
-        projeto: "", servico: "", descricao: "", anotInternas: "",
-        clienteExistente: false, cliente: "", clienteEmail: "", clienteTel: "",
-        unidade: "", cidade: "", estado: "", cep: "", anotPropriedade: "",
-        data: "", horario: "",
-      });
+      const initial = prefill ? { ...EMPTY_CREATE_TASK_DATA, ...prefill } : { ...EMPTY_CREATE_TASK_DATA };
+      setData(initial);
       setErr({});
+      setClientSearchQuery(initial.cliente || "");
+      setClientResults([]);
+      setSearchingClients(false);
     }
-  }, [open]);
+  }, [open, prefill]);
+
+  useEffect(() => {
+    if (!open || !data.clienteExistente || data.clientId) {
+      setClientResults([]);
+      return undefined;
+    }
+
+    const query = clientSearchQuery.trim();
+    if (query.length < 2) {
+      setClientResults([]);
+      setSearchingClients(false);
+      return undefined;
+    }
+
+    setSearchingClients(true);
+    const timer = setTimeout(() => {
+      searchClients(query, clientSearchMode)
+        .then((rows) => setClientResults(rows))
+        .catch(() => setClientResults([]))
+        .finally(() => setSearchingClients(false));
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [open, data.clienteExistente, data.clientId, clientSearchQuery, clientSearchMode]);
 
   const set = (k, v) => setData((d) => ({ ...d, [k]: v }));
 
-  const validate = () => {
-    const e = {};
-    if (!data.projeto) e.projeto = "Título é obrigatório.";
-    if (data.projeto.length > 100) e.projeto = "O título do projeto não deve exceder 100 caracteres.";
-    if (!data.servico) e.servico = "O tipo de serviço é obrigatório.";
-    if (!data.descricao) e.descricao = "A descrição da tarefa é obrigatória.";
-    if (data.descricao.length > 1000) e.descricao = "A descrição da tarefa não deve exceder 1.000 caracteres.";
-    if (!data.cliente) e.cliente = "O nome do cliente é obrigatório.";
-    if (data.cliente.length > 100) e.cliente = "O nome do cliente não deve exceder 100 caracteres.";
-    if (data.clienteEmail && !/^\S+@\S+\.\S+$/.test(data.clienteEmail)) e.clienteEmail = "Digite um endereço de e-mail válido.";
-    if (!data.unidade) e.unidade = "Unidade, apartamento ou sala é obrigatório.";
-    if (!data.cidade) e.cidade = "Cidade é obrigatória.";
-    if (!data.estado) e.estado = "Estado é obrigatório.";
-    if (!data.cep) e.cep = "Código postal é obrigatório.";
-    if (!data.data) e.data = "A data de agendamento é obrigatória.";
-    if (!data.horario) e.horario = "O horário é obrigatório.";
-    setErr(e);
-    return Object.keys(e).length === 0;
+  const selectClient = (client) => {
+    setData((d) => ({ ...d, ...mapClientToTaskPrefill(client) }));
+    setClientSearchQuery(client.name);
+    setClientResults([]);
   };
 
-  const submit = () => {
-    if (!validate()) {
-      toast({ kind: "error", title: "Não foi possível criar a tarefa", desc: "Revise os campos obrigatórios e tente novamente." });
+  const clearSelectedClient = () => {
+    setData((d) => ({
+      ...d,
+      clientId: undefined,
+      cliente: "",
+      clienteEmail: "",
+      clienteTelCountryCode: DEFAULT_PHONE_COUNTRY_CODE,
+      clienteTelNationalNumber: "",
+      unidade: "",
+      logradouro: "",
+      cidade: "",
+      estado: "",
+      cep: "",
+      clientePreferredLanguage: DEFAULT_CLIENT_LANGUAGE,
+    }));
+    setClientSearchQuery("");
+    setClientResults([]);
+  };
+
+  const skipAddressValidation = !!data.clientId;
+
+  const buildErrors = (throughStep = 4) => {
+    const e = {};
+
+    if (throughStep >= 1) {
+      if (!data.projeto?.trim()) e.projeto = "Título é obrigatório.";
+      else if (data.projeto.length > 100) e.projeto = "O título do projeto não deve exceder 100 caracteres.";
+      if (!data.servico) e.servico = "O tipo de serviço é obrigatório.";
+      if (!data.descricao?.trim()) e.descricao = "A descrição da tarefa é obrigatória.";
+      else if (data.descricao.length > 1000) e.descricao = "A descrição da tarefa não deve exceder 1.000 caracteres.";
+    }
+
+    if (throughStep >= 2) {
+      if (data.clienteExistente) {
+        if (!data.clientId) e.cliente = "Busque e selecione um cliente da lista.";
+      } else if (!data.cliente?.trim()) {
+        e.cliente = "O nome do cliente é obrigatório.";
+      } else if (data.cliente.length > 100) {
+        e.cliente = "O nome do cliente não deve exceder 100 caracteres.";
+      }
+      if (data.clienteEmail && !/^\S+@\S+\.\S+$/.test(data.clienteEmail)) {
+        e.clienteEmail = "Digite um endereço de e-mail válido.";
+      }
+    }
+
+    if (throughStep >= 3 && !skipAddressValidation) {
+      if (!data.unidade?.trim()) e.unidade = "Unidade, apartamento ou sala é obrigatório.";
+      if (!data.cidade?.trim()) e.cidade = "Cidade é obrigatória.";
+      if (!data.estado?.trim()) e.estado = "Estado é obrigatório.";
+      if (!data.cep?.trim()) e.cep = "Código postal é obrigatório.";
+    }
+
+    if (throughStep >= 4) {
+      if (!data.data) e.data = "A data de agendamento é obrigatória.";
+      if (!data.horario) e.horario = "O horário é obrigatório.";
+    }
+
+    return e;
+  };
+
+  const firstErrorStep = (e) => {
+    const byStep = [
+      ["projeto", "servico", "descricao"],
+      ["cliente", "clienteEmail"],
+      ["unidade", "cidade", "estado", "cep"],
+      ["data", "horario"],
+    ];
+    for (let i = 0; i < byStep.length; i += 1) {
+      if (i === 2 && skipAddressValidation) continue;
+      if (byStep[i].some((field) => e[field])) return i + 1;
+    }
+    return 1;
+  };
+
+  const goNext = () => {
+    const e = buildErrors(step);
+    setErr(e);
+    if (Object.keys(e).length > 0) {
+      toast({
+        kind: "error",
+        title: "Campos obrigatórios",
+        desc: "Preencha os campos desta etapa antes de continuar.",
+      });
       return;
     }
-    onCreate(data);
-    toast({ kind: "success", title: "Tarefa criada com sucesso", desc: `${data.projeto}` });
-    onClose();
+    setStep((s) => Math.min(4, s + 1));
+  };
+
+  const submit = async () => {
+    const e = buildErrors(4);
+    setErr(e);
+    if (Object.keys(e).length > 0) {
+      const errorStep = firstErrorStep(e);
+      setStep(errorStep);
+      toast({
+        kind: "error",
+        title: "Não foi possível criar a tarefa",
+        desc: `Revise a etapa 0${errorStep} e tente novamente.`,
+      });
+      return;
+    }
+    try {
+      await onCreate(data);
+      onClose();
+    } catch (err) {
+      const msg = err.response?.data?.message;
+      toast({
+        kind: "error",
+        title: "Erro ao criar tarefa",
+        desc: Array.isArray(msg) ? msg.join(", ") : msg || "Não foi possível salvar a tarefa. Tente novamente.",
+      });
+    }
   };
 
   if (!open) return null;
@@ -583,7 +995,7 @@ function CreateTaskModal({ open, onClose, onCreate }) {
       footer={
         <>
           <Button variant="ghost" onClick={onClose}>Cancelar</Button>
-          {step < 4 ? <Button onClick={() => setStep(s => Math.min(4, s + 1))}>Continuar <Icon.ArrowRight size={14}/></Button> : null}
+          {step < 4 ? <Button onClick={goNext}>Continuar <Icon.ArrowRight size={14}/></Button> : null}
           {step === 4 ? <Button icon={Icon.Plus} onClick={submit}>Criar Tarefa</Button> : null}
         </>
       }
@@ -626,67 +1038,231 @@ function CreateTaskModal({ open, onClose, onCreate }) {
         <div className="col" style={{ gap: 14 }}>
           <Checkbox
             checked={data.clienteExistente}
-            onChange={(v) => set("clienteExistente", v)}
+            onChange={(v) => {
+              set("clienteExistente", v);
+              if (!v) {
+                clearSelectedClient();
+                resetClientSearch();
+              } else {
+                clearSelectedClient();
+              }
+            }}
             label="Cliente existente (buscar no cadastro)"
           />
-          <Field label={data.clienteExistente ? "Buscar Cliente" : "Nome do Cliente"} error={err.cliente}>
-            <Input
-              value={data.cliente}
-              onChange={(e) => set("cliente", e.target.value)}
-              leading={data.clienteExistente ? <Icon.Search size={14}/> : null}
-              placeholder={data.clienteExistente ? "Digite para buscar…" : "Nome completo"}
-              err={!!err.cliente}
-              maxLength={100}
-            />
-          </Field>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-            <Field label="E-mail" optional error={err.clienteEmail}>
-              <Input
-                type="email"
-                value={data.clienteEmail}
-                onChange={(e) => set("clienteEmail", e.target.value)}
-                leading={<Icon.Mail size={14}/>}
-                placeholder="cliente@exemplo.com"
-                err={!!err.clienteEmail}
-              />
-            </Field>
-            <Field label="Telefone" optional>
-              <Input
-                value={data.clienteTel}
-                onChange={(e) => set("clienteTel", e.target.value)}
-                leading={<Icon.Phone size={14}/>}
-                placeholder="+55 11 9 ..."
-              />
-            </Field>
-          </div>
+
           {data.clienteExistente ? (
-            <div style={{ border: "1px solid var(--gold-30)", padding: 12, borderRadius: 4, background: "rgba(194,164,109,0.06)", fontSize: 12.5, color: "var(--fg-3)", display: "flex", gap: 10, alignItems: "flex-start" }}>
-              <Icon.Info size={14} style={{ color: "var(--gold)", marginTop: 1 }}/>
-              <div>Detalhes do cliente foram carregados com sucesso. Os campos da propriedade serão pré-preenchidos automaticamente.</div>
-            </div>
-          ) : null}
+            <>
+              <div className="view-switcher" style={{ width: "fit-content" }}>
+                <button
+                  type="button"
+                  className={clientSearchMode === "name" ? "active" : ""}
+                  onClick={() => {
+                    setClientSearchMode("name");
+                    if (!data.clientId) setClientResults([]);
+                  }}
+                >
+                  Por nome
+                </button>
+                <button
+                  type="button"
+                  className={clientSearchMode === "phone" ? "active" : ""}
+                  onClick={() => {
+                    setClientSearchMode("phone");
+                    if (!data.clientId) setClientResults([]);
+                  }}
+                >
+                  Por telefone
+                </button>
+                <button
+                  type="button"
+                  className={clientSearchMode === "email" ? "active" : ""}
+                  onClick={() => {
+                    setClientSearchMode("email");
+                    if (!data.clientId) setClientResults([]);
+                  }}
+                >
+                  Por e-mail
+                </button>
+              </div>
+
+              {data.clientId ? (
+                <div style={{
+                  border: "1px solid var(--gold-30)",
+                  borderRadius: 4,
+                  padding: 14,
+                  background: "rgba(181, 235, 12,0.06)",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 12,
+                }}>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ color: "var(--fg)", fontWeight: 500 }}>{data.cliente}</div>
+                    <div className="muted small" style={{ marginTop: 4 }}>
+                      {formatPhoneDisplay(data.clienteTelCountryCode, data.clienteTelNationalNumber)} · {data.clienteEmail || "sem e-mail"}
+                    </div>
+                  </div>
+                  <Button size="sm" variant="ghost" onClick={clearSelectedClient}>Trocar</Button>
+                </div>
+              ) : (
+                <>
+                  <Field
+                    label={
+                      clientSearchMode === "phone"
+                        ? "Buscar por telefone"
+                        : clientSearchMode === "email"
+                          ? "Buscar por e-mail"
+                          : "Buscar por nome"
+                    }
+                    error={err.cliente}
+                    hint={
+                      clientSearchMode === "phone"
+                        ? "Digite ao menos 2 dígitos"
+                        : clientSearchMode === "email"
+                          ? "Digite ao menos 2 caracteres"
+                          : "Digite ao menos 2 letras"
+                    }
+                  >
+                    <Input
+                      value={clientSearchQuery}
+                      onChange={(e) => setClientSearchQuery(e.target.value)}
+                      leading={
+                        clientSearchMode === "phone"
+                          ? <Icon.Phone size={14}/>
+                          : clientSearchMode === "email"
+                            ? <Icon.Mail size={14}/>
+                            : <Icon.Search size={14}/>
+                      }
+                      placeholder={
+                        clientSearchMode === "phone"
+                          ? "Ex: 1198214422"
+                          : clientSearchMode === "email"
+                            ? "cliente@email.com"
+                            : "Ex: João Silva"
+                      }
+                      err={!!err.cliente}
+                    />
+                  </Field>
+
+                  {searchingClients ? (
+                    <div className="muted small">A buscar clientes…</div>
+                  ) : null}
+
+                  {!searchingClients && clientSearchQuery.trim().length >= 2 && clientResults.length === 0 ? (
+                    <div className="muted small">Nenhum cliente encontrado.</div>
+                  ) : null}
+
+                  {clientResults.length > 0 ? (
+                    <div style={{
+                      border: "1px solid var(--border)",
+                      borderRadius: 4,
+                      overflow: "hidden",
+                      maxHeight: 220,
+                      overflowY: "auto",
+                    }}>
+                      {clientResults.map((client) => (
+                        <button
+                          key={client.id}
+                          type="button"
+                          onClick={() => selectClient(client)}
+                          style={{
+                            width: "100%",
+                            textAlign: "left",
+                            padding: "12px 14px",
+                            border: 0,
+                            borderBottom: "1px solid var(--border)",
+                            background: "var(--bg-elevated)",
+                            cursor: "pointer",
+                          }}
+                        >
+                          <div style={{ color: "var(--fg)", fontWeight: 500 }}>{client.name}</div>
+                          <div className="muted small mono" style={{ marginTop: 2 }}>{client.tel}</div>
+                          {client.email ? (
+                            <div className="muted small" style={{ marginTop: 2 }}>{client.email}</div>
+                          ) : null}
+                        </button>
+                      ))}
+                    </div>
+                  ) : null}
+                </>
+              )}
+
+              {data.clientId ? (
+                <div style={{ border: "1px solid var(--gold-30)", padding: 12, borderRadius: 4, background: "rgba(181, 235, 12,0.06)", fontSize: 12.5, color: "var(--fg-3)", display: "flex", gap: 10, alignItems: "flex-start" }}>
+                  <Icon.Info size={14} style={{ color: "var(--gold)", marginTop: 1 }}/>
+                  <div>Endereço do cadastro será usado na etapa de propriedade. Você pode ajustar na próxima etapa.</div>
+                </div>
+              ) : null}
+            </>
+          ) : (
+            <>
+              <Field label="Nome do Cliente" error={err.cliente}>
+                <Input
+                  value={data.cliente}
+                  onChange={(e) => set("cliente", e.target.value)}
+                  placeholder="Nome completo"
+                  err={!!err.cliente}
+                  maxLength={100}
+                />
+              </Field>
+              <Field label="Telefone" optional>
+                <PhoneInput
+                  countryCode={data.clienteTelCountryCode}
+                  nationalNumber={data.clienteTelNationalNumber}
+                  onChange={({ countryCode, nationalNumber }) =>
+                    setData((d) => ({
+                      ...d,
+                      clienteTelCountryCode: countryCode,
+                      clienteTelNationalNumber: nationalNumber,
+                    }))
+                  }
+                />
+              </Field>
+              <Field label="E-mail" optional error={err.clienteEmail}>
+                <Input
+                  type="email"
+                  value={data.clienteEmail}
+                  onChange={(e) => set("clienteEmail", e.target.value)}
+                  leading={<Icon.Mail size={14}/>}
+                  placeholder="cliente@exemplo.com"
+                  err={!!err.clienteEmail}
+                />
+              </Field>
+            </>
+          )}
+
+          <ClientLanguageSelect
+            value={data.clientePreferredLanguage}
+            onChange={(lang) => set("clientePreferredLanguage", lang)}
+            disabled={!!data.clientId}
+            hint={data.clientId ? "Idioma definido no cadastro do cliente" : undefined}
+          />
         </div>
       ) : null}
 
       {step === 3 ? (
         <div className="col" style={{ gap: 14 }}>
-          <Field label="Unidade / Apartamento / Sala" error={err.unidade}>
+          {skipAddressValidation ? (
+            <div style={{ border: "1px solid var(--gold-30)", padding: 12, borderRadius: 4, background: "rgba(181, 235, 12,0.06)", fontSize: 12.5, color: "var(--fg-3)", display: "flex", gap: 10, alignItems: "flex-start" }}>
+              <Icon.Info size={14} style={{ color: "var(--gold)", marginTop: 1 }}/>
+              <div>Cliente já cadastrado — endereço é opcional. Preencha apenas se for diferente do cadastro.</div>
+            </div>
+          ) : null}
+          <Field label="Unidade / Apartamento / Sala" optional={skipAddressValidation} error={err.unidade}>
             <Input value={data.unidade} onChange={(e) => set("unidade", e.target.value)} placeholder="Ex: Apto 1402, Torre B" err={!!err.unidade}/>
           </Field>
-          <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr 1fr", gap: 12 }}>
-            <Field label="Cidade" error={err.cidade}>
-              <Input value={data.cidade} onChange={(e) => set("cidade", e.target.value)} err={!!err.cidade}/>
-            </Field>
-            <Field label="Estado" error={err.estado}>
-              <Select value={data.estado} onChange={(e) => set("estado", e.target.value)} err={!!err.estado}>
-                <option value="">UF</option>
-                {BGG_DATA.estados.map(s => <option key={s} value={s}>{s}</option>)}
-              </Select>
-            </Field>
-            <Field label="CEP" error={err.cep}>
-              <Input value={data.cep} onChange={(e) => set("cep", e.target.value)} placeholder="00000-000" err={!!err.cep}/>
-            </Field>
-          </div>
+          <AddressLocationFields
+            phoneCountryCode={data.clienteTelCountryCode}
+            cidade={data.cidade}
+            estado={data.estado}
+            cep={data.cep}
+            optional={skipAddressValidation}
+            cidadeError={err.cidade}
+            estadoError={err.estado}
+            cepError={err.cep}
+            onCidadeChange={(value) => set("cidade", value)}
+            onEstadoChange={(value) => set("estado", value)}
+            onCepChange={(value) => set("cep", value)}
+          />
           <Field label="Anotações da Propriedade" optional hint="Ex: ponto de água, restrições de horário, vaga de garagem.">
             <Textarea value={data.anotPropriedade} onChange={(e) => set("anotPropriedade", e.target.value)} maxLength={1000}/>
           </Field>
@@ -717,7 +1293,7 @@ function CreateTaskModal({ open, onClose, onCreate }) {
               <div className="tiny muted">Fotos · vídeos · documentos · até 5 arquivos</div>
             </div>
           </Field>
-          <div style={{ border: "1px solid var(--gold-30)", background: "rgba(194,164,109,0.05)", padding: 14, borderRadius: 4 }}>
+          <div style={{ border: "1px solid var(--gold-30)", background: "rgba(181, 235, 12,0.05)", padding: 14, borderRadius: 4 }}>
             <div style={{ color: "var(--gold)", fontSize: 11, letterSpacing: "0.12em", textTransform: "uppercase", marginBottom: 8, fontWeight: 500 }}>Resumo</div>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, fontSize: 12.5 }}>
               <div><span className="muted">Projeto: </span><span style={{ color: "var(--fg)" }}>{data.projeto || "—"}</span></div>
@@ -734,4 +1310,174 @@ function CreateTaskModal({ open, onClose, onCreate }) {
 }
 
 
-export { AssignTechModal, ScheduleModal, CreateTaskModal };
+function TaskOrcamentoModal({ open, task, onClose, onSave }) {
+  const [form, setForm] = useState({
+    valor: "",
+    status: "Pendente",
+    fatura: "",
+    metodo: "",
+    deposito: "",
+    saldo: "",
+  });
+  const [saving, setSaving] = useState(false);
+  const [err, setErr] = useState({});
+  const toast = useToast();
+
+  useEffect(() => {
+    if (!open || !task) return;
+    const o = task.orcamento || {};
+    setForm({
+      valor: String(o.valor ?? 0),
+      status: o.status || "Pendente",
+      fatura: o.fatura && o.fatura !== "—" ? o.fatura : "",
+      metodo: o.metodo && o.metodo !== "—" ? o.metodo : "",
+      deposito: String(o.deposito ?? 0),
+      saldo: String(o.saldo ?? 0),
+    });
+    setErr({});
+  }, [open, task?.id]);
+
+  if (!open || !task) return null;
+
+  const submit = async () => {
+    const next = {};
+    const valor = Number(form.valor);
+    const deposito = Number(form.deposito);
+    if (!form.valor || Number.isNaN(valor) || valor < 0) next.valor = "Informe um valor válido.";
+    if (Number.isNaN(deposito) || deposito < 0) next.deposito = "Depósito inválido.";
+    if (deposito > valor) next.deposito = "Depósito não pode exceder o valor total.";
+    setErr(next);
+    if (Object.keys(next).length) return;
+
+    const saldo = form.saldo !== "" && !Number.isNaN(Number(form.saldo))
+      ? Number(form.saldo)
+      : Math.max(0, valor - deposito);
+
+    setSaving(true);
+    try {
+      await onSave(task.id, {
+        valor,
+        status: form.status,
+        fatura: form.fatura.trim() || "—",
+        metodo: form.metodo.trim() || "—",
+        deposito,
+        saldo,
+      });
+      toast({ kind: "success", title: "Orçamento atualizado", desc: task.id });
+      onClose();
+    } catch {
+      /* erro exibido pelo App */
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const previewSaldo = (() => {
+    const valor = Number(form.valor) || 0;
+    const deposito = Number(form.deposito) || 0;
+    if (form.saldo !== "" && !Number.isNaN(Number(form.saldo))) return Number(form.saldo);
+    return Math.max(0, valor - deposito);
+  })();
+
+  return (
+    <Modal
+      open={open}
+      onClose={onClose}
+      title={`Editar orçamento · ${task.id}`}
+      sub={`${task.projeto} · ${task.cliente}`}
+      size="lg"
+      footer={
+        <>
+          <Button variant="ghost" onClick={onClose}>Cancelar</Button>
+          <Button icon={Icon.Check} disabled={saving} onClick={submit}>
+            {saving ? "A guardar…" : "Guardar alterações"}
+          </Button>
+        </>
+      }
+    >
+      <div className="col" style={{ gap: 16 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+          <Field label="Valor do orçamento" error={err.valor}>
+            <Input
+              type="number"
+              min={0}
+              step={0.01}
+              value={form.valor}
+              onChange={(e) => setForm((f) => ({ ...f, valor: e.target.value }))}
+              err={!!err.valor}
+            />
+          </Field>
+          <Field label="Status">
+            <Select
+              value={form.status}
+              onChange={(e) => setForm((f) => ({ ...f, status: e.target.value }))}
+            >
+              <option value="Pendente">Pendente</option>
+              <option value="Aprovado">Aprovado</option>
+              <option value="Cancelado">Cancelado</option>
+            </Select>
+          </Field>
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+          <Field label="ID da fatura">
+            <Input
+              value={form.fatura}
+              onChange={(e) => setForm((f) => ({ ...f, fatura: e.target.value }))}
+              placeholder="FAT-00829"
+            />
+          </Field>
+          <Field label="Método de pagamento">
+            <Select
+              value={form.metodo}
+              onChange={(e) => setForm((f) => ({ ...f, metodo: e.target.value }))}
+            >
+              <option value="">—</option>
+              <option value="Cartão de Crédito">Cartão de Crédito</option>
+              <option value="Pix">Pix</option>
+              <option value="Transferência">Transferência</option>
+              <option value="Dinheiro">Dinheiro</option>
+            </Select>
+          </Field>
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+          <Field label="Depósito" error={err.deposito}>
+            <Input
+              type="number"
+              min={0}
+              step={0.01}
+              value={form.deposito}
+              onChange={(e) => setForm((f) => ({ ...f, deposito: e.target.value }))}
+              err={!!err.deposito}
+            />
+          </Field>
+          <Field label="Saldo restante" hint="Calculado automaticamente se vazio">
+            <Input
+              type="number"
+              min={0}
+              step={0.01}
+              value={form.saldo}
+              onChange={(e) => setForm((f) => ({ ...f, saldo: e.target.value }))}
+              placeholder={String(previewSaldo)}
+            />
+          </Field>
+        </div>
+        <div style={{ background: "var(--bg-elevated)", border: "1px solid var(--gold-30)", borderRadius: 4, padding: 14 }}>
+          <div className="row" style={{ justifyContent: "space-between" }}>
+            <span className="tiny muted" style={{ letterSpacing: "0.1em", textTransform: "uppercase" }}>Total</span>
+            <span className="num-display" style={{ color: "var(--gold)", fontSize: 22, fontWeight: 500 }}>
+              {formatEUR(Number(form.valor) || 0)}
+            </span>
+          </div>
+          <div className="row" style={{ justifyContent: "space-between", marginTop: 8 }}>
+            <span className="tiny muted">Saldo após depósito</span>
+            <span className="mono" style={{ color: previewSaldo > 0 ? "#d4a017" : "#8fbf6a" }}>
+              {formatEUR(previewSaldo)}
+            </span>
+          </div>
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
+export { AssignTechModal, ScheduleModal, CreateTaskModal, TaskOrcamentoModal };

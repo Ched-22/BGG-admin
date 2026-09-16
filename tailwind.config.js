@@ -7,7 +7,7 @@ export default {
         bg: "#0B0B0B",
         "bg-elevated": "#1a1a1a",
         fg: "#EDEDED",
-        gold: "#C2A46D",
+        gold: "#B5EB0C",
         neutral: "#8A8A8A",
         destructive: "#d4183d",
       },

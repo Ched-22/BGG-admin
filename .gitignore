@@ -1,5 +1,11 @@
-node_modules
-dist
+/node_modules
+/dist
 .DS_Store
 *.local
 .env
+.env.example
+.cursor
+PRD/
+PR_DESCRIPTION/
+node_modules
+dist

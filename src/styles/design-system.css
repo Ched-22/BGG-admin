@@ -1,5 +1,5 @@
 /* ============================================================
-   Black Gold Garage — Colors & Type
+   Black Green Garage — Colors & Type
    Source of truth: src/styles/theme.css in Ched-22/BGG
    The product is a single dark-only marketing site (no light mode).
    ============================================================ */
@@ -22,20 +22,20 @@
   --fg-5:         rgba(237, 237, 237, 0.60);
   --fg-6:         rgba(237, 237, 237, 0.40);
 
-  --gold:           #C2A46D;
-  --gold-90:        rgba(194, 164, 109, 0.90);
-  --gold-80:        rgba(194, 164, 109, 0.80);
-  --gold-30:        rgba(194, 164, 109, 0.30);
-  --gold-20:        rgba(194, 164, 109, 0.20);
+  --gold:           #B5EB0C;
+  --gold-90:        rgba(181, 235, 12, 0.90);
+  --gold-80:        rgba(181, 235, 12, 0.80);
+  --gold-30:        rgba(181, 235, 12, 0.30);
+  --gold-20:        rgba(181, 235, 12, 0.20);
   --gold-on:        #0B0B0B;
 
   --neutral:        #8A8A8A;
   --destructive:    #d4183d;
   --destructive-fg: #EDEDED;
 
-  --border:         rgba(194, 164, 109, 0.20);
+  --border:         rgba(181, 235, 12, 0.20);
   --input-bg:       #1a1a1a;
-  --ring:           #C2A46D;
+  --ring:           #B5EB0C;
 
   /* Admin surfaces */
   --surface-sidebar: #0a0a0a;
@@ -50,15 +50,24 @@
   --surface-auth-end: #050505;
   --overlay-modal: rgba(0, 0, 0, 0.7);
   --overlay-cal-muted: rgba(0, 0, 0, 0.2);
-  --accent-hover: rgba(194, 164, 109, 0.06);
-  --accent-active: rgba(194, 164, 109, 0.10);
-  --accent-subtle: rgba(194, 164, 109, 0.10);
+  --accent-hover: rgba(181, 235, 12, 0.06);
+  --accent-active: rgba(181, 235, 12, 0.10);
+  --accent-subtle: rgba(181, 235, 12, 0.10);
   --shadow-sm-theme: 0 1px 2px rgba(0, 0, 0, 0.4);
   --shadow-theme: 0 4px 16px rgba(0, 0, 0, 0.5);
   --shadow-lg-theme: 0 12px 32px rgba(0, 0, 0, 0.6);
-  --grid-line: rgba(194, 164, 109, 0.04);
-  --gold-glow-1: rgba(194, 164, 109, 0.18);
-  --gold-glow-2: rgba(194, 164, 109, 0.08);
+  --grid-line: rgba(181, 235, 12, 0.04);
+  --gold-glow-1: rgba(181, 235, 12, 0.18);
+  --gold-glow-2: rgba(181, 235, 12, 0.08);
+
+  /* Calendar — cor apenas nos blocos de serviço por baia */
+  --cal-bay-1-ev-bg: rgba(181, 235, 12, 0.28);
+  --cal-bay-1-ev-border: #B5EB0C;
+  --cal-bay-1-ev-time: #B5EB0C;
+  --cal-bay-2-ev-bg: rgba(106, 159, 191, 0.28);
+  --cal-bay-2-ev-border: #6a9fbf;
+  --cal-bay-2-ev-time: #4a87ad;
+  --cal-bay-stripe-width: 3px;
 }
 
 [data-theme="light"] {
@@ -75,20 +84,20 @@
   --fg-5:         rgba(26, 26, 26, 0.58);
   --fg-6:         rgba(26, 26, 26, 0.42);
 
-  --gold:           #9A7D45;
-  --gold-90:        rgba(154, 125, 69, 0.90);
-  --gold-80:        rgba(154, 125, 69, 0.80);
-  --gold-30:        rgba(154, 125, 69, 0.30);
-  --gold-20:        rgba(154, 125, 69, 0.22);
+  --gold:           #6C8D07;
+  --gold-90:        rgba(108, 141, 7, 0.90);
+  --gold-80:        rgba(108, 141, 7, 0.80);
+  --gold-30:        rgba(108, 141, 7, 0.30);
+  --gold-20:        rgba(108, 141, 7, 0.22);
   --gold-on:        #FFFCF7;
 
   --neutral:        #6B6B6B;
   --destructive:    #c41e3a;
   --destructive-fg: #FFFFFF;
 
-  --border:         rgba(154, 125, 69, 0.28);
+  --border:         rgba(108, 141, 7, 0.28);
   --input-bg:       #FFFFFF;
-  --ring:           #9A7D45;
+  --ring:           #6C8D07;
 
   --surface-sidebar: #F0EDE8;
   --surface-topbar: rgba(247, 245, 241, 0.94);
@@ -102,15 +111,23 @@
   --surface-auth-end: #E8E4DD;
   --overlay-modal: rgba(26, 26, 26, 0.45);
   --overlay-cal-muted: rgba(0, 0, 0, 0.06);
-  --accent-hover: rgba(154, 125, 69, 0.10);
-  --accent-active: rgba(154, 125, 69, 0.16);
-  --accent-subtle: rgba(154, 125, 69, 0.12);
+  --accent-hover: rgba(108, 141, 7, 0.10);
+  --accent-active: rgba(108, 141, 7, 0.16);
+  --accent-subtle: rgba(108, 141, 7, 0.12);
   --shadow-sm-theme: 0 1px 2px rgba(26, 26, 26, 0.06);
   --shadow-theme: 0 4px 16px rgba(26, 26, 26, 0.08);
   --shadow-lg-theme: 0 12px 32px rgba(26, 26, 26, 0.12);
-  --grid-line: rgba(154, 125, 69, 0.08);
-  --gold-glow-1: rgba(154, 125, 69, 0.22);
-  --gold-glow-2: rgba(154, 125, 69, 0.10);
+  --grid-line: rgba(108, 141, 7, 0.08);
+  --gold-glow-1: rgba(108, 141, 7, 0.22);
+  --gold-glow-2: rgba(108, 141, 7, 0.10);
+
+  --cal-bay-1-ev-bg: rgba(108, 141, 7, 0.22);
+  --cal-bay-1-ev-border: #6C8D07;
+  --cal-bay-1-ev-time: #6C8D07;
+  --cal-bay-2-ev-bg: rgba(106, 159, 191, 0.22);
+  --cal-bay-2-ev-border: #6a9fbf;
+  --cal-bay-2-ev-time: #4a87ad;
+  --cal-bay-stripe-width: 3px;
 }
 
 :root {
@@ -118,6 +135,7 @@
   /* ---------- Typography ---------- */
   --font-display: "Cormorant Garamond", Georgia, "Times New Roman", serif;
   --font-body:    "Montserrat", ui-sans-serif, system-ui, sans-serif;
+  --font-numeric: "Montserrat", ui-sans-serif, system-ui, sans-serif;
 
   --weight-light:  300;
   --weight-normal: 400;
